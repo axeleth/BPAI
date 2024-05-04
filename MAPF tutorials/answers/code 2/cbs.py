@@ -1,0 +1,366 @@
+import time as timer
+import heapq
+import random
+from single_agent_planner import compute_heuristics, a_star, get_location, get_sum_of_cost
+
+
+def detect_collision(path1, path2):
+    ##############################
+    # Task 3.1: Return the first collision that occurs between two robot paths (or None if there is no collision)
+    #           There are two types of collisions: vertex collision and edge collision.
+    #           A vertex collision occurs if both robots occupy the same location at the same timestep
+    #           An edge collision occurs if the robots swap their location at the same timestep.
+    #           You should use "get_location(path, t)" to get the location of a robot at time t.
+
+    for t in range(max(len(path1), len(path2))):
+        # extract the current coordinates along the path
+        c1 = get_location(path1, t)
+        c2 = get_location(path2, t)
+        if c1 == c2:
+            return [c1, t]
+        else:
+            # extract the previous coordinates along the path
+            # (for edge checking)
+            p1 = get_location(path1, t - 1)
+            p2 = get_location(path2, t - 1)
+            if c1 == p2 and c2 == p1:
+                return [p1, c1, t]
+    return None
+
+
+def detect_collisions(paths):
+    ##############################
+    # Task 3.1: Return a list of first collisions between all robot pairs.
+    #           A collision can be represented as dictionary that contains the id of the two robots, the vertex or edge
+    #           causing the collision, and the timestep at which the collision occurred.
+    #           You should use your detect_collision function to find a collision between two robots.
+
+    collisions = []
+    for i in range(len(paths) - 1):
+        for j in range(i + 1, len(paths)):
+            collision = detect_collision(paths[i], paths[j])
+            if collision is not None:
+                collisions.append({'a1': i,
+                                  'a2': j,
+                                  'loc': collision[:-1],
+                                  'timestep': collision[-1]})
+    return collisions
+
+
+def standard_splitting(collision):
+    ##############################
+    # Task 3.2: Return a list of (two) constraints to resolve the given collision
+    #           Vertex collision: the first constraint prevents the first agent to be at the specified location at the
+    #                            specified timestep, and the second constraint prevents the second agent to be at the
+    #                            specified location at the specified timestep.
+    #           Edge collision: the first constraint prevents the first agent to traverse the specified edge at the
+    #                          specified timestep, and the second constraint prevents the second agent to traverse the
+    #                          specified edge at the specified timestep
+
+    constraint1 = {'agent': collision['a1'],
+                   'loc': collision['loc'],
+                   'timestep': collision['timestep'],
+                   'positive': False}
+    loc = list(collision['loc'])
+    loc.reverse()  # if this is an edge collision, we need to use the other direction of the edge in the constraint
+    constraint2 = {'agent': collision['a2'],
+                   'loc': loc,
+                   'timestep': collision['timestep'],
+                   'positive': False}
+    return [constraint1, constraint2]
+
+
+def disjoint_splitting(collision):
+    ##############################
+    # Task 4.1: Return a list of (two) constraints to resolve the given collision
+    #           Vertex collision: the first constraint enforces one agent to be at the specified location at the
+    #                            specified timestep, and the second constraint prevents the same agent to be at the
+    #                            same location at the timestep.
+    #           Edge collision: the first constraint enforces one agent to traverse the specified edge at the
+    #                          specified timestep, and the second constraint prevents the same agent to traverse the
+    #                          specified edge at the specified timestep
+    #           Choose the agent randomly
+
+    i = random.randint(0, 1)
+    if i == 0:
+        constraint1 = {'agent': collision['a1'],
+                       'loc': collision['loc'],
+                       'timestep': collision['timestep'],
+                       'positive': True}
+        constraint2 = {'agent': collision['a1'],
+                       'loc': collision['loc'],
+                       'timestep': collision['timestep'],
+                       'positive': False}
+    else:
+        loc = list(collision['loc'])
+        loc.reverse()  # if this is an edge collision, we need to use the other direction of the edge in the constraint
+        constraint1 = {'agent': collision['a2'],
+                       'loc': loc,
+                       'timestep': collision['timestep'],
+                       'positive': True}
+        constraint2 = {'agent': collision['a2'],
+                       'loc': loc,
+                       'timestep': collision['timestep'],
+                       'positive': False}
+    return [constraint1, constraint2]
+
+
+def paths_violate_constraint(constraint, paths):
+    assert constraint['positive'] is True
+    rst = []
+    for i in range(len(paths)):
+        if i == constraint['agent']:
+            continue
+        curr = get_location(paths[i], constraint['timestep'])
+        prev = get_location(paths[i], constraint['timestep'] - 1)
+        if len(constraint['loc']) == 1:  # vertex constraint
+            if constraint['loc'][0] == curr:
+                rst.append(i)
+        else:  # edge constraint
+            if constraint['loc'][0] == prev or constraint['loc'][1] == curr \
+                    or constraint['loc'] == [curr, prev]:
+                rst.append(i)
+    return rst
+
+
+class CBSSolver(object):
+    """The high-level search of CBS."""
+
+    def __init__(self, my_map, starts, goals):
+        """my_map   - list of lists specifying obstacle positions
+        starts      - [(x1, y1), (x2, y2), ...] list of start locations
+        goals       - [(x1, y1), (x2, y2), ...] list of goal locations
+        """
+
+        self.my_map = my_map
+        self.starts = starts
+        self.goals = goals
+        self.num_of_agents = len(goals)
+
+        self.num_of_generated = 0
+        self.num_of_expanded = 0
+        self.CPU_time = 0
+
+        self.open_list = []
+
+        # compute heuristics for the low-level search
+        self.heuristics = []
+        for goal in self.goals:
+            self.heuristics.append(compute_heuristics(my_map, goal))
+
+    def push_node(self, node):
+        heapq.heappush(self.open_list, (node['cost'], len(node['collisions']), self.num_of_generated, node))
+        print("Generate node {}".format(self.num_of_generated))
+        self.num_of_generated += 1
+
+    def pop_node(self):
+        _, _, id, node = heapq.heappop(self.open_list)
+        print("Expand node {}".format(id))
+        self.num_of_expanded += 1
+        return node
+
+    def find_solution(self, disjoint=True):
+        """ Finds paths for all agents from their start locations to their goal locations
+
+        disjoint    - use disjoint splitting or not
+        time_limit  - maximum amount of execution time allowed
+        """
+
+        start_time = timer.time()
+
+        # Generate the root node
+        # constraints   - list of constraints
+        # paths         - list of paths, one for each agent
+        #               [[(x11, y11), (x12, y12), ...], [(x21, y21), (x22, y22), ...], ...]
+        # collisions     - list of collisions in paths
+        root = {'cost': 0,
+                'constraints': [],
+                'paths': [],
+                'collisions': []}
+        for i in range(self.num_of_agents):  # Find initial path for each agent
+            path = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
+                          i, root['constraints'])
+            if path is None:
+                raise BaseException('No solutions')
+            root['paths'].append(path)
+
+        root['cost'] = get_sum_of_cost(root['paths'])
+        root['collisions'] = detect_collisions(root['paths'])
+        self.push_node(root)
+
+        # Task 3.1: Testing
+        print(root['collisions'])
+
+        # Task 3.2: Testing
+        for collision in root['collisions']:
+            print(standard_splitting(collision))
+
+        ##############################
+        # Task 3.3: High-Level Search
+        #           Repeat the following as long as the open list is not empty:
+        #             1. Get the next node from the open list (you can use self.pop_node()
+        #             2. If this node has no collision, return solution
+        #             3. Otherwise, choose the first collision and convert to a list of constraints (using your
+        #                standard_splitting function). Add a new child node to your open list for each constraint
+        #           Ensure to create a copy of any objects that your child nodes might inherit
+
+        # Search the tree until the open list is empty
+        # while len(self.open_list) > 0:
+        
+        #     node = self.pop_node()  # pop the node with the minimum cost
+        #     if node['collisions'] == []:  # the paths of this node is collision-free
+        #         self.CPU_time = timer.time() - start_time
+        #         self.print_results(node)
+        #         return node['paths']
+        
+        #     collision = node['collisions'][0]  # choose a collision
+        #     print("Choose a collision between {} and {} at location {} at timestep {}".format(
+        #         collision['a1'], collision['a2'], collision['loc'], collision['timestep']))
+        
+        #     # Generate constraints to resolve the chosen collision
+        #     new_constraints = standard_splitting(collision)
+        
+        #     for constraint in new_constraints:  # for each constraint, generate a child node
+        #         i = constraint['agent']
+        #         print("Negative constraint on agent {} at location {} at timestep {}".format(
+        #                 constraint['agent'], constraint['loc'], constraint['timestep']))
+        
+        #         constraints = list(node['constraints'])  # copy constraints
+        #         constraints.append(constraint)  # add additional constraint
+        
+        #         paths = list(node['paths'])  # copy paths
+        #         paths[i] = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
+        #                           i, constraints, paths)  # replan for this agent
+        
+        #         # Generate a child node if paths[i] exists
+        #         if paths[i] is not None:
+        #             child_node = {'cost': get_sum_of_cost(paths),
+        #                           'constraints':constraints,
+        #                           'paths': paths,
+        #                           'collisions': detect_collisions(paths)}
+        #             self.push_node(child_node)
+        
+        # raise BaseException('No solutions')
+
+        while len(self.open_list) > 0:
+
+            node = self.pop_node()  # pop the node with the minimum cost
+            if node['collisions'] == []:  # the paths of this node is collision-free
+                self.CPU_time = timer.time() - start_time
+                self.print_results(node)
+                return node['paths']
+
+            collision = node['collisions'][0]  # choose a collision
+            print("Choose a collision between {} and {} at location {} at timestep {}".format(
+                collision['a1'], collision['a2'], collision['loc'], collision['timestep']))
+
+            # Generate constraints to resolve the chosen collision
+            if disjoint:
+                new_constraints = disjoint_splitting(collision)
+            else:
+                new_constraints = standard_splitting(collision)
+
+            for constraint in new_constraints:  # for each constraint, generate a child node
+                print("Constraint on agent {} at location {} at timestep {}".format(
+                    constraint['agent'], constraint['loc'], constraint['timestep']))
+
+                constraints = list(node['constraints'])  # copy constraints
+                constraints.append(constraint)  # add additional constraint
+
+                paths = list(node['paths'])  # copy paths
+
+                # Find agents that need to be re-planned
+                replan = []
+                if constraint['positive']:  # positive constraint
+                    # Any paths that violate this positive constraint needs to be re-planned
+                    replan = paths_violate_constraint(constraint, paths)
+                else:  # negative constraint
+                    # Only the constrained path needs to be re-planned
+                    replan.append(constraint['agent'])
+
+                prune = False
+                for i in replan:
+                    paths[i] = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
+                                      i, constraints)
+                    if paths[i] is None:
+                        prune = True
+                        break
+
+                if not prune:
+                    # Generate a child node
+                    child_node = {'cost': get_sum_of_cost(paths),
+                                  'constraints': constraints,
+                                  'paths': paths,
+                                  'collisions': detect_collisions(paths)}
+                    self.push_node(child_node)
+
+        raise BaseException('No solutions')
+
+        # # Search the tree until the open list is empty
+        # while len(self.open_list) > 0:
+        
+        #     node = self.pop_node()  # pop the node with the minimum cost
+        #     if node['collisions'] == []:  # the paths of this node is collision-free
+        #         self.CPU_time = timer.time() - start_time
+        #         self.print_results(node)
+        #         return node['paths']
+        
+        #     collision = node['collisions'][0]  # choose a collision
+        #     print("Choose a collision between {} and {} at location {} at timestep {}".format(
+        #         collision['a1'], collision['a2'], collision['loc'], collision['timestep']))
+        
+        #     # Generate constraints to resolve the chosen collision
+        #     if disjoint:
+        #         new_constraints = disjoint_splitting(collision)
+        #     else:
+        #         new_constraints = standard_splitting(collision)
+        
+        #     for constraint in new_constraints:  # for each constraint, generate a child node
+        #         if constraint['positive']:
+        #             print("Positive constraint on agent {} at location {} at timestep {}".format(
+        #                 constraint['agent'], constraint['loc'], constraint['timestep']))
+        #         else:
+        #             print("Negative constraint on agent {} at location {} at timestep {}".format(
+        #                 constraint['agent'], constraint['loc'], constraint['timestep']))
+        
+        #         # Generate a child node
+        #         child_node = {'cost': 0,
+        #                       'constraints': list(node['constraints']),
+        #                       'paths': list(node['paths']),
+        #                       'collisions': []}
+        #         child_node['constraints'].append(constraint)  # add the new constraint to the child node
+        
+        #         # Find agents that need to be re-planned
+        #         replan = []
+        #         if constraint['positive']:  # positive constraint
+        #             # Any paths that violate this positive constraint needs to be re-planned
+        #             replan = paths_violate_constraint(constraint, child_node['paths'])
+        #         else:  # negative constraint
+        #             # Only the constrained path needs to be re-planned
+        #             replan.append(constraint['agent'])
+        
+        #         # Re-plan all paths that violate the new constraint
+        #         pruned = False
+        #         for i in replan:
+        #             child_node['paths'][i] = []  # delete the current path
+        #             path = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
+        #                           i, child_node['constraints'], child_node['paths'])
+        #             if path is None:  # no solution
+        #                 pruned = True  # so this node need to be pruned
+        #                 break
+        #             print(" Find a new path for agent {}".format(i))
+        #             child_node['paths'][i] = path
+        
+        #         if pruned is False:
+        #             child_node['collisions'] = detect_collisions(child_node['paths'])
+        #             child_node['cost'] = get_sum_of_cost(child_node['paths'])
+        #             self.push_node(child_node)
+        
+        # raise BaseException('No solutions')
+
+    def print_results(self, node):
+        print("\n Found a solution! \n")
+        print("CPU time (s):    {:.2f}".format(self.CPU_time))
+        print("Sum of costs:    {}".format(get_sum_of_cost(node['paths'])))
+        print("Expanded nodes:  {}".format(self.num_of_expanded))
+        print("Generated nodes: {}".format(self.num_of_generated))
