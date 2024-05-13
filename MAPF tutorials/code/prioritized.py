@@ -45,8 +45,10 @@ class PrioritizedPlanningSolver(object):
             #            * constraints: array of constraints to consider for future A* searches
 
             constraints = [
-                {'agent' : 0, 'loc': [(1,5)], 'timestep': 4},
-                ]
+            {'agent' : 1, 'loc': [(1,4)], 'timestep': 2},
+            {'agent' : 1, 'loc': [(1,3)], 'timestep': 2},
+            {'agent' : 1, 'loc': [(1,2)], 'timestep': 2}
+        ]
             ##############################
 
         self.CPU_time = timer.time() - start_time
