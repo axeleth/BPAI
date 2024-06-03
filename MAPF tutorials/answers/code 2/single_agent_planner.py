@@ -102,6 +102,8 @@ def build_constraint_table(constraints, agent):
         else:  # negative edge constraint
             constraint_table[constraint['timestep']].append({'loc': constraint['loc'], 'positive': False})
 
+
+    # print(constraint_table)
     return constraint_table
 
 

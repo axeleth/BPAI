@@ -29,13 +29,18 @@ class PrioritizedPlanningSolver(object):
         start_time = timer.time()
         result = []
         constraints = []
+        max_path_length = 0
 
         for i in range(self.num_of_agents):  # Find path for each agent
+            upper_bound = len(self.my_map) * len(self.my_map[0]) + max_path_length
+            print("upper bound: ", upper_bound)
             path = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
                           i, constraints)
-            if path is None:
+            print("path length: ", len(path))
+            if path is None or len(path)>=upper_bound:
                 raise BaseException('No solutions')
             result.append(path)
+            max_path_length = max(max_path_length, len(path))
 
             ##############################
             # Task 2: Add constraints here
@@ -44,11 +49,34 @@ class PrioritizedPlanningSolver(object):
             #            * self.num_of_agents has the number of total agents
             #            * constraints: array of constraints to consider for future A* searches
 
-            constraints = [
-            {'agent' : 1, 'loc': [(1,4)], 'timestep': 2},
-            {'agent' : 1, 'loc': [(1,3)], 'timestep': 2},
-            {'agent' : 1, 'loc': [(1,2)], 'timestep': 2}
-        ]
+        #     constraints = [
+        #     {'agent' : 1, 'loc': [(1,4)], 'timestep': 2},
+        #     {'agent' : 1, 'loc': [(1,3)], 'timestep': 2},
+        #     {'agent' : 1, 'loc': [(1,2)], 'timestep': 2}
+        # ]
+            
+            for t in range(len(path)):
+                for k in range(i, self.num_of_agents):
+                    # add vertex constraint
+                    constraints.append({'agent': k,
+                                        'loc': [path[t]],
+                                        'timestep': t,
+                                        'positive': False})
+                    # add edge constraint
+                    if t > 0:
+                        constraints.append({'agent': k,
+                                            'loc': [path[t], path[t-1]],
+                                            'timestep': t,
+                                            'positive': False})
+            
+            # upper bound T=height*width+max(path_length)
+            for t in range(len(path), upper_bound+1):
+                for k in range(i, self.num_of_agents):
+                    # add vertex constraint
+                    constraints.append({'agent': k,
+                                        'loc': [path[-1]],
+                                        'timestep': t,
+                                        'positive': False})
             ##############################
 
         self.CPU_time = timer.time() - start_time

@@ -33,10 +33,10 @@ class PrioritizedPlanningSolver(object):
 
         for i in range(self.num_of_agents):  # Find path for each agent
             upper_bound = len(self.my_map) * len(self.my_map[0]) + max_path_length
-            print(upper_bound)
+            print("upper bound: ", upper_bound)
             path = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
                           i, constraints)
-            print(len(path))
+            print("path length: ", len(path))
             if path is None or len(path)>=upper_bound:
                 raise BaseException('No solutions')
             result.append(path)

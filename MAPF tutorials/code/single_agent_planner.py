@@ -54,19 +54,59 @@ def build_constraint_table(constraints, agent):
     #               for a more efficient constraint violation check in the 
     #               is_constrained function.
 
-    max_timestep = -1 
+    # max_timestep = -1
+    # for constraint in constraints:
+    #     if constraint['agent'] == agent:
+    #         max_timestep = max(max_timestep, constraint['timestep'])
+
+    # constraint_table = [[] for _ in range(max_timestep + 1)]
+
+    # for constraint in constraints:
+    #     if constraint['agent'] == agent:
+    #         constraint_table[constraint['timestep']].append({'loc':constraint['loc']})
+
+    # return constraint_table
+
+    positive = []
+    negative = []
+    max_timestep = -1
+
     for constraint in constraints:
-        if constraint['agent'] == agent:
+        if constraint['positive']:
+            if constraint['agent'] == agent:
+                positive.append(constraint)
+            else: 
+                negative.append(constraint)
+            max_timestep = max(max_timestep, constraint['timestep'])
+
+        elif constraint['agent'] == agent:
+            negative.append(constraint)
             max_timestep = max(max_timestep, constraint['timestep'])
 
     constraint_table = [[] for _ in range(max_timestep + 1)]
+    for constraint in positive:
+        if len(constraint['loc']) == 1: # positive vertex constraint
+            constraint_table[constraint['timestep']].append({'loc': [constraint['loc'][0]], 'positive': True})
+        else: # positive edge constraint
+            constraint_table[constraint['timestep'] - 1].append({'loc': [constraint['loc'][0]], 'positive': True})
+            constraint_table[constraint['timestep']].append({'loc': [constraint['loc'][0]], 'positive': True})
 
-    for constraint in constraints:
-        if constraint['agent'] == agent:
-            constraint_table[constraint['timestep']].append({'loc':constraint['loc']})
+    for constraint in negative:
+        if len(constraint['loc']) == 1: #vertex constraint
+            constraint_table[constraint['timestep']].append({'loc': constraint['loc'], 'positive': False})
+        elif constraint['positive']:  # positive edge constraint for other agents
+            constraint_table[constraint['timestep'] - 1].append({'loc': [constraint['loc'][0]], 'positive': False})
+            constraint_table[constraint['timestep']].append({'loc': [constraint['loc'][1]], 'positive': False})
+            constraint_table[constraint['timestep']].append({'loc': [constraint['loc'][1], constraint['loc'][0]], 'positive': False})
+        else: # negative edge constraint
+            constraint_table[constraint['timestep']].append({'loc': constraint['loc'], 'positive': False})
 
+    
+    # print(constraint_table)
     return constraint_table
 
+            
+    # you can continue this when you come to it
 
 def get_location(path, time):
     if time < 0:
@@ -93,15 +133,35 @@ def is_constrained(curr_loc, next_loc, next_time, constraint_table):
     #               any given constraint. For efficiency the constraints are indexed in a constraint_table
     #               by time step, see build_constraint_table.
 
+    # if len(constraint_table) <= next_time:
+    #     return False
+    
+    # for constraint in constraint_table[next_time]:
+    #     # print(constraint, curr_loc, next_loc, next_time)
+    #     if constraint['loc'] == [next_loc] or constraint['loc'] == [curr_loc, next_loc]:
+    #         return True
+    #     else:
+    #         if constraint['loc'] == [curr_loc, next_loc]:
+    #             return True
+        
+        
+    # return False
+
     if len(constraint_table) <= next_time:
         return False
     
     for constraint in constraint_table[next_time]:
-        # print(constraint, curr_loc, next_loc, next_time)
-        if constraint['loc'] == [next_loc] or constraint['loc'] == [curr_loc, next_loc]:
-            return True
-        
-        
+        if constraint['positive']: # positive constraint
+            if constraint['loc'][0] != next_loc:
+                return True
+        else: # negative constraint
+            if len(constraint['loc']) == 1: # vertex constraint
+                if constraint['loc'][0] == next_loc:
+                    return True
+            else: # edge constraint
+                if constraint['loc'] == [curr_loc, next_loc]:
+                    return True
+                
     return False
 
 
@@ -131,6 +191,7 @@ def a_star(my_map, start_loc, goal_loc, h_values, agent, constraints):
     # Task 1.1: Extend the A* search to search in the space-time domain
     #           rather than space domain, only.
 
+    # print("constraints: ", constraints)
     constraint_table = build_constraint_table(constraints, agent)
     open_list = []
     closed_list = dict()
@@ -143,7 +204,7 @@ def a_star(my_map, start_loc, goal_loc, h_values, agent, constraints):
         curr = pop_node(open_list)
         #############################
         # Task 1.4: Adjust the goal test condition to handle goal constraints
-        if curr['loc'] == goal_loc:
+        if curr['loc'] == goal_loc and curr['timestep'] >= earliest_goal_timestep:
             found = True
             if curr['timestep'] + 1 < len(constraint_table):
                 for t in range(curr['timestep'] + 1, len(constraint_table)):
