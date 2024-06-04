@@ -280,6 +280,7 @@ class CBSSolver(object):
 
                 prune = False
                 for i in replan:
+                    print("!!!!!!!!! ", constraints)
                     paths[i] = a_star(self.my_map, self.starts[i], self.goals[i], self.heuristics[i],
                                       i, constraints)
                     if paths[i] is None:

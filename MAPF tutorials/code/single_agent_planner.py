@@ -54,18 +54,6 @@ def build_constraint_table(constraints, agent):
     #               for a more efficient constraint violation check in the 
     #               is_constrained function.
 
-    # max_timestep = -1
-    # for constraint in constraints:
-    #     if constraint['agent'] == agent:
-    #         max_timestep = max(max_timestep, constraint['timestep'])
-
-    # constraint_table = [[] for _ in range(max_timestep + 1)]
-
-    # for constraint in constraints:
-    #     if constraint['agent'] == agent:
-    #         constraint_table[constraint['timestep']].append({'loc':constraint['loc']})
-
-    # return constraint_table
 
     positive = []
     negative = []
