@@ -13,7 +13,7 @@ from visualization import map_initialization, map_running
 from Aircraft import Aircraft
 from independent import run_independent_planner
 from prioritized import run_prioritized_planner
-from cbs import run_CBS
+from cbs import CBSSolver # used to be just run_CBS but now I made the sovler object like in the tutorial
 
 #%% SET SIMULATION PARAMETERS
 #Input file names (used in import_layout) -> Do not change those unless you want to specify a new layout.
@@ -22,7 +22,7 @@ edges_file = "edges.xlsx" #xlsx file with for each edge: from  (node), to (node)
 
 #Parameters that can be changed:
 simulation_time = 20
-planner = "Independent" #choose which planner to use (currently only Independent is implemented)
+planner = "CBS" #choose which planner to use (currently only Independent is implemented)
 
 #Visualization (can also be changed)
 plot_graph = False    #show graph representation in NetworkX
@@ -193,7 +193,23 @@ while running:
     elif planner == "Prioritized":
         run_prioritized_planner()
     elif planner == "CBS":
-        run_CBS()
+        if t%0.5==0:  # at every timestep when an agent reaches a node (multiple of 0.5 sec)
+            current_node = 0
+            current_location_aircraft = [] # a list that stores all current aircraft locations
+            for ac in aircraft_lst:
+                if ac.status == "taxiing":
+                    id = ac.id
+                    position = ac.position
+                    for i in range (109): # number of nodes in the graph
+                        if nodes_dict[i]["xy_pos"] == position:
+                            current_node = nodes_dict[i]['id']
+                    current_location_aircraft.append((current_node, t, id)) # add the current node at time t
+                                                                            # and id to the locations list
+
+            #generate the CBS object:
+            cbs = CBSSolver(nodes_dict, edges_dict, aircraft_lst, heuristics, t, starts, goals, current_location_aircraft)
+
+            run_CBS(nodes_dict, edges_dict, aircraft_lst, heuristics, t)
     #elif planner == -> you may introduce other planners here
     else:
         raise Exception("Planner:", planner, "is not defined.")
