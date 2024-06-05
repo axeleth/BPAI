@@ -157,6 +157,13 @@ time_end = simulation_time
 dt = 0.1 #should be factor of 0.5 (0.5/dt should be integer)
 t= 0
 
+timesteps = []
+
+result = []
+starts = []
+goals = []
+original_path_lst = []
+
 print("Simulation Started")
 while running:
     t= round(t,2)    
