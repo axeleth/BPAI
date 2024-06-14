@@ -1,10 +1,11 @@
 from single_agent_planner import simple_single_agent_astar
+from deviate import is_it_a_node
 import math
 
 class Aircraft(object):
     """Aircraft class, should be used in the creation of new aircraft."""
 
-    def __init__(self, flight_id, a_d, start_node, goal_node, spawn_time, nodes_dict):
+    def __init__(self, flight_id, a_d, start_node, goal_node, speed, spawn_time, nodes_dict):
         """
         Initalisation of aircraft object.
         INPUT:
@@ -13,11 +14,11 @@ class Aircraft(object):
             - start_node: node_id of start node
             - goal_node: node_id of goal node
             - spawn_time: spawn_time of a/c 
-            - nodes_dict: copy of the nodes_dict
+            - nodes_dict: copy of the nodes_dic
         """
         
         #Fixed parameters
-        self.speed = 1         #how much a/c moves per unit of t
+        self.speed = speed         #how much a/c moves per unit of t          # normally set to 1 <-----!!
         self.id = flight_id       #flight_id
         self.type = a_d           #arrival or departure (A/D)
         self.spawntime = spawn_time #spawntime
@@ -33,6 +34,9 @@ class Aircraft(object):
         #State related
         self.heading = 0
         self.position = (0,0) #xy position on map
+        self.replanning = False # is this agent replanning or spawning?
+        self.replan_time = None # what time does the agent plan start?
+        self.waiting = False # is the agent waiting for a slot?
 
     def get_heading(self, xy_start, xy_next):
         """
@@ -78,19 +82,42 @@ class Aircraft(object):
         xy_from = self.nodes_dict[from_node]["xy_pos"] #xy position of from node
         xy_to = self.nodes_dict[to_node]["xy_pos"] #xy position of to node
         distance_to_move = self.speed*dt #distance to move in this timestep
-  
+    
         #Update position with rounded values
         x = xy_to[0]-xy_from[0]
         y = xy_to[1]-xy_from[1]
-        x_normalized = x / math.sqrt(x**2+y**2)
-        y_normalized = y / math.sqrt(x**2+y**2)
-        posx = round(self.position[0] + x_normalized * distance_to_move ,2) #round to prevent errors
+
+        if x == 0 and y!=0:
+            x_normalized = 0
+            y_normalized = y / math.sqrt(x ** 2 + y ** 2)
+            self.waiting = False
+        elif x == 0 and y==0:
+            x_normalized = 0
+            y_normalized = 0
+            self.waiting = True
+        elif x!=0 and y==0:
+            x_normalized = x / math.sqrt(x ** 2 + y ** 2)
+            y_normalized = 0
+            self.waiting = False
+        elif x!=0 and y!=0:
+            x_normalized = x / math.sqrt(x ** 2 + y ** 2)
+            y_normalized = y / math.sqrt(x ** 2 + y ** 2)
+            self.waiting = False
+
+        distance_to_next_node = round(math.sqrt((xy_to[0] - self.position[0])**2 + (xy_to[1] - self.position[1])**2),2)
+
+        posx = round(self.position[0] + x_normalized * distance_to_move ,2) #round to prevent errors –––––> Current position + unit vector * distance of next step
         posy = round(self.position[1] + y_normalized * distance_to_move ,2) #round to prevent errors
+        # if self.id == 2: print("AC{} location just before step: {}".format(self.id, self.position))
         self.position = (posx, posy)  
         self.get_heading(xy_from, xy_to)	
 
-        #Check if goal is reached or if to_node is reached
+        # if self.id == 2: print("AC2 position: ", self.position, " xy_to: ", xy_to, " path_to_goal: ", self.path_to_goal[0], " t: ", t, " dt: ", dt)
         if self.position == xy_to and self.path_to_goal[0][1] == t+dt: #If with this move its current to node is reached
+            # print(" ")
+            # print("AC: ", self.id, " just stepped to node: ", self.path_to_goal[0][0], " (note that the time has not been updated yet and is still: ", t, ")")
+            # print("position: ", self.position)
+            # print(" ")
             if self.position == self.nodes_dict[self.goal]["xy_pos"]: #if the final goal is reached
                 self.status = "arrived"
 
@@ -106,6 +133,9 @@ class Aircraft(object):
                 
                 self.from_to = [new_from_id, new_next_id] #update new from and to node
 
+        # elif detect_deviation(self.position, xy_to, self.path_to_goal, t, dt):
+        #     raise Exception("Aircraft deviated from path")
+        
     def plan_independent(self, nodes_dict, edges_dict, heuristics, t):
         """
         Plans a path for taxiing aircraft assuming that it knows the entire layout.
@@ -114,23 +144,66 @@ class Aircraft(object):
             - nodes_dict: copy of the nodes_dict
             - edges_dict: edges_dict with current edge weights
         """
+
+        if self.status == "taxiing": # Planning only occurs when an aircraft is in the taxiing state.
+            if self.replanning == False: # if this is the first time planning
+            
+
+                start_node = self.start #node from which planning should be done (just the node id)
+                goal_node = self.goal #node to which planning should be done (just the node id)
+                agent = self.id
+                constraints = []
+                
+                success, path = simple_single_agent_astar(nodes_dict, start_node, goal_node, heuristics, t, agent, self.speed,
+                                                          constraints) 
+                if success:
+                    self.path_to_goal = path[1:]
+                    next_node_id = self.path_to_goal[0][0] #next node is first node in path_to_goal
+                    self.from_to = [path[0][0], next_node_id]
+                    print("Path AC", self.id, ":", path)
+                else:
+                    raise Exception("No solution found for", self.id)
+                
+                #Check the path
+                if path[0][1] != t:
+                    raise Exception("Something is wrong with the timing of the path planning")
         
-        if self.status == "taxiing":
-            start_node = self.start #node from which planning should be done
-            goal_node = self.goal #node to which planning should be done
-            
-            success, path = simple_single_agent_astar(nodes_dict, start_node, goal_node, heuristics, t)
-            if success:
-                self.path_to_goal = path[1:]
-                next_node_id = self.path_to_goal[0][0] #next node is first node in path_to_goal
-                self.from_to = [path[0][0], next_node_id]
-                print("Path AC", self.id, ":", path)
-            else:
-                raise Exception("No solution found for", self.id)
-            
-            #Check the path
-            if path[0][1] != t:
-                raise Exception("Something is wrong with the timing of the path planning")
+            elif self.replanning == True: # if this planning is as a result of deviation
+                if t == self.replan_time: # if the agent is at a node. (This is the time to start the new plan from)
+                    print("AC",self.id, ": t == replan_time")
+                    current_node_id = is_it_a_node(self.position, nodes_dict, retrieve_node=True)
+                    print("from_to[1]: ", self.from_to[1], "curr_node_id: ", current_node_id)
+                    # start_node = self.from_to[1] # this needs to be exactly the node that the next node
+                    start_node = current_node_id
+                    goal_node = self.goal
+
+                    success, path = simple_single_agent_astar(nodes_dict, start_node, goal_node, heuristics, t, self.speed) # I added speed but this is not being used yet in the function
+                    if success:
+                        self.path_to_goal = path[1:] # The path EXCLUDES the first (current) node
+                        next_node_id = self.path_to_goal[0][0] #next node is first node in path_to_goal
+                        self.from_to = [path[0][0], next_node_id]
+                        print("Path AC", self.id, ":", path)
+                    else:
+                        raise Exception("No solution found for", self.id)
+
+                elif t != self.replan_time: # if the agent is between nodes. This is the time to start the new plan from
+                    print("AC",self.id, ": t != replan_time")
+                    old_start = self.from_to[0]
+                    start_node = self.from_to[1]
+                    goal_node = self.goal
+
+                    print("AC{} in the middle has replan time {}".format(self.id, self.replan_time))
+
+                    success, path = simple_single_agent_astar(nodes_dict, start_node, goal_node, heuristics, self.replan_time, self.speed) # I added speed but this is not being used yet in the function
+                    if success:
+                        self.path_to_goal = path # The path INCLUDES the first (next) node
+                        next_node_id = self.path_to_goal[0][0] #next node is first node in path_to_goal
+                        self.from_to = [old_start, next_node_id]
+                        print("Path AC", self.id, ":", path)
+                    else:
+                        raise Exception("No solution found for", self.id)
+                
+
 
     
 
