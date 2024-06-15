@@ -205,12 +205,12 @@ while running:
 
     #Spawn aircraft for this timestep (use for example a random process)
     if t == 1 :
-        ac0 = Aircraft(0, 'D', 36,37,1,t, nodes_dict) #As an example we will create one aicraft arriving at node 37 with the goal of reaching node 36
+        ac0 = Aircraft(0, 'D', 37,97,1,t, nodes_dict) #As an example we will create one aicraft arriving at node 37 with the goal of reaching node 36
         aircraft_lst.append(ac0)
         starts.append(ac0.start)
         goals.append(ac0.goal)
 
-        ac1 = Aircraft(1, 'D', 37,36,2,t, nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
+        ac1 = Aircraft(1, 'D', 97,37,2,t, nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
         aircraft_lst.append(ac1)
         starts.append(ac1.start)
         goals.append(ac1.goal)
@@ -294,64 +294,66 @@ while running:
                 if paths is not None:
                     results = paths
 
+
+    # aircraft_infront(aircraft_lst, t) # if if there is about to be a rear end collision, slow down the faster aircraft
             
-            
-
-
-
-
-
-    elif planner == "Independent": # and aircraft_lst != []
-
-        # you can change the following condition to trigger replanning at a specified time step!!!! Right now it only plans at timestep 1.
-
-        # example:
-        # if t == 1 OR deviation_detected == True:
-        #   run_independent_planner()
-
-        if t == 1:
-
-        # this one is here for the random spawner
-        # if len(aircraft_lst) == 1: #(Hint: Think about the condition that triggers (re)planning)
-            # if aircraft_lst[0].spawntime == t: # t == 1 is reserved for the initial planning
-
-            run_independent_planner(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-
-        if len(aircraft_lst) != 1: # This part is here for when new aircraft are spawned in the middle of the simulation
-            for ac in aircraft_lst:
-                if ac.spawntime == t and t != 1: # REMOVE T==1 WHEN USING RANDOM SPAWNER
-                    print("AC{} has spawned at time {}".format(ac.id, t))
-                    ac.status = "taxiing" # taxiing
-                    ac.position = nodes_dict[ac.start]["xy_pos"] # position
-                    # print("now it has position:", ac.position, "and is", ac.status)
-                    prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-                    run_independent_replanner(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-                    # for ac in aircraft_lst:
-                    #     print(ac.path_to_goal)
-
-        if detect_deviation(aircraft_lst, nodes_dict, t):  # or new_aircraft == True
-            prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-            run_independent_replanner(aircraft_lst, nodes_dict, edges_dict, heuristics, t) # Independent RE-planner
-            new_aircraft = False
-
-            # raise Exception("Aircraft deviated from path!")
-
-
-
-    elif planner == "Prioritized":
-        run_prioritized_planner()
-
-    #elif planner == -> you may introduce other planners here
-    # else:
-    #     raise Exception("Planner:", planner, "is not defined.")
-
-    #Move the aircraft that are taxiing
     if aircraft_lst != []:
         for ac in aircraft_lst:
             if ac.status == "taxiing":
                 ac.move(dt, t)
 
     t = t + dt
+            
+
+
+
+
+
+    # elif planner == "Independent": # and aircraft_lst != []
+
+    #     # you can change the following condition to trigger replanning at a specified time step!!!! Right now it only plans at timestep 1.
+
+    #     # example:
+    #     # if t == 1 OR deviation_detected == True:
+    #     #   run_independent_planner()
+
+    #     if t == 1:
+
+    #     # this one is here for the random spawner
+    #     # if len(aircraft_lst) == 1: #(Hint: Think about the condition that triggers (re)planning)
+    #         # if aircraft_lst[0].spawntime == t: # t == 1 is reserved for the initial planning
+
+    #         run_independent_planner(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
+
+    #     if len(aircraft_lst) != 1: # This part is here for when new aircraft are spawned in the middle of the simulation
+    #         for ac in aircraft_lst:
+    #             if ac.spawntime == t and t != 1: # REMOVE T==1 WHEN USING RANDOM SPAWNER
+    #                 print("AC{} has spawned at time {}".format(ac.id, t))
+    #                 ac.status = "taxiing" # taxiing
+    #                 ac.position = nodes_dict[ac.start]["xy_pos"] # position
+    #                 # print("now it has position:", ac.position, "and is", ac.status)
+    #                 prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
+    #                 run_independent_replanner(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
+    #                 # for ac in aircraft_lst:
+    #                 #     print(ac.path_to_goal)
+
+    #     if detect_deviation(aircraft_lst, nodes_dict, t):  # or new_aircraft == True
+    #         prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
+    #         run_independent_replanner(aircraft_lst, nodes_dict, edges_dict, heuristics, t) # Independent RE-planner
+    #         new_aircraft = False
+
+            # raise Exception("Aircraft deviated from path!")
+
+
+
+    # elif planner == "Prioritized":
+    #     run_prioritized_planner()
+
+    #elif planner == -> you may introduce other planners here
+    # else:
+    #     raise Exception("Planner:", planner, "is not defined.")
+
+    #Move the aircraft that are taxiing
 
 # =============================================================================
 # 2. Implement analysis of output data here

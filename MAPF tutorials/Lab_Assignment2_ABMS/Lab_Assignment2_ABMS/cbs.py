@@ -1,40 +1,3 @@
-"""
-Implement CBS here
-
-R is the root node
-R.constraints = []
-R.paths = [] # list of paths for each agent, found using A* search
-R.collisions = list of collisions for each agent, found using detect_collisions(R.paths)
-R.cost = get_sum_of_costs(R.paths) 
-insert R into OPEN # OPEN is the open list of nodes that need to be explored
-
-while OPEN is not empty:
-
-    ### we explore the node with the lowest cost
-    N = node from open with the LOWEST COST                     # remember to remove this node from the open list!
-    if N.collisions is empty:                                   # here we have used 'detect_collisions(N.paths)' to get N.collisions
-        return N.paths                                          # The paths in N are now an optimal solution and N is a GOAL NODE
-        
-    collision = N.collisions[0]                                 # get the first collision in N.collisions (any collision)
-    constraints = standard splitting(collision)                 # turn the collision into 2 constraints. This is a function that you need to implement!
-
-    ### create new nodes for each new constraint
-    for constraint in constraints:
-        N_new = N.copy                                          # make a copy of N //// (or make a new node)
-        N_new.constraints = N.constraints AND [constraint]      # add the constraint to the new node
-        N_new.paths = N.paths                                   # copy the paths from N to N_new
-        a_i = the agent in question                             # each constraint is connected to an agent.
-        path = a_star(a_i, N_new.constraints)                   # find a new path for the agent in question, given the constraints
-        
-        ### 
-        if path is not emtpy:
-            replace the path fo agent a_i in N_new.paths with path
-            N_new.collisions = detect_collisions(N_new.paths)
-            N_new.cost = get_sum_of_costs(N_new.paths)
-            insert N_new into OPEN
-
-return "No solution found"
-"""
 
 import heapq
 import copy
@@ -56,58 +19,143 @@ def detect_collision(path1:list, path2:list, agent1:int, agent2:int, t:int, ac_l
 
     ac1 = ac_list[agent1]
     ac2 = ac_list[agent2]
-        
+    
     for i in range(len(path1)):
         for j in range(len(path2)):
-            if path1[i][1]==path2[j][1] and path1[i][0]==path2[j][0]:
-                # if ac1.speed != ac2.speed: # if speed is a mismatch
-                #     if ac1.speed > ac2.speed: # if ac1 is faster 
-                #         if path1[i-1][0]==path2[j-1][0] and path1[i-1][1] != path2[i-1][1]:
-                #             print("path1[i][0]:", path1[i][0], "path2[j][0]:", path2[j][0])
-                #             print("path1[i-1][0]:", path1[i-1][0], "path2[j-1][0]:", path2[j-1][0])
-                #             print("path1[i-1][1]:", path1[i-1][1], "path2[j-1][1]:", path2[j-1][1])
-                #             rear_collision = agent1
-                #             return {'a1': agent1, 'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i-1][1], 'rear_collision': agent1}
-                #             raise Exception("HERE!") # return a collision
-                #     elif ac1.speed < ac2.speed: # if ac2 is faster
-                #         if path1[i-1][0]==path2[j-1][0] and path1[i-1][1] != path2[i-1][1]:
-                #             print("path1[i][0]:", path1[i][0], "path2[j][0]:", path2[j][0])
-                #             print("path1[i-1][0]:", path1[i-1][0], "path2[j-1][0]:", path2[j-1][0])
-                #             print("path1[i-1][1]:", path1[i-1][1], "path2[j-1][1]:", path2[j-1][1])
-                #             rear_collision = agent2
-                #             return {'a1': agent1, 'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i-1][1], 'rear_collision': agent2}
-                #             raise Exception("HERE!2")
+
+            if ac1.speed == ac2.speed: # if the agents have the same speed
                 
-                
-                if ac1.speed == ac2.speed:
-                    return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1]}
+                # Vertex 1 – Same speed, same location, same time
+                if path1[i][0] == path2[j][0] and path1[i][1] == path2[j][1]:
+                    print("VERTEX 1")
+                    # raise Exception("VERTEX 1")
+                    return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1], 'type': 'vertex1'}
 
-    # Edge collisions
-            if path1[i][1]>1 and path2[j][1]>1: # THIS USED TO BE >=1 ON BOTH SIDES BUT I CHANGED IT SO THEY DON'T SEE THE FIRST STEP AS AN EDGE COLLISION WHEN THEIR GOALS AND STARTS ARE INVERSELY THE SAME
-                if path1[i][1]==path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
-                    
-                    return {'a1': agent1,'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1]}
-
-                # Speed-based edge collisions
-                else:
-                    # raise Exception("Making speed-based edge collisions")
-                    if ac1.speed > ac2.speed:
-                        if path1[i][1]+0.25==path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
-                        # raise Exception("Making speed-based edge collisions where ac1 is faster than ac2")
-                            return {'a1': agent1,'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1]}
-                    elif ac1.speed < ac2.speed:
-                        if path1[i][1]-0.25==path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
-                            return {'a1': agent1,'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1]}
-
-    # # Two aircraft using the same runway
-    if path1[-1][1]==path2[-1][1] and ((path1[-1][0]==1 or path1[-1][0]==2) and (path2[-1][0]==1 or path2[-1][0]==2)):
+                # Edge 1 – Same speed and same edge, agents trade nodes and reach their respective new nodes at the same time
+                if path1[i][1]>1 and path2[j][1]>1:
+                    if path1[i][1] == path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
+                        print("EDGE 1")
+                        # raise Exception("EDGE 1")
+                        # {agent1, agent2, [location1, location2], t, edge1} 
+                        # note that agent 1 moves from location 1 to location and agent 2 does the opposite
+                        return {'a1': agent1, 'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1], 'type': 'edge1'}
         
-        # Determining when two aircraft intend to use the same runway, at the same time
-        if agent1<agent2:
 
-            return {'a1': agent2, 'a2': agent2, 'loc': [path2[-1][0]], 'timestep': path2[-1][1]}
-        else:
-            return {'a1': agent1, 'a2': agent1, 'loc': [path1[-1][0]], 'timestep': path1[-1][1]}
+
+            else: # if the agents have different speeds
+
+                if ac1.speed > ac2.speed: # if ac1 is faster
+                    
+                    if path1[i-1][1] == path2[j-1][1] + 0.25 and path1[i][1] == path2[j][1]:
+                        # Vertex 2.3.1 – different speed same location (fast agent follows slow agent and catches up)
+                        if path1[i-1][0] == path2[j-1][0] and path1[i][0] == path2[j][0]:
+                            print("VERTEX 2.3.1 (agent 1 is faster than agent 2)")
+                            # raise Exception("VERTEX 2.3.1 (agent 1 is faster than agent 2)")
+                            return {'a1': agent1, 'a2': agent2, 'loc1': [path2[j-1][0]], 'loc2':[path2[j][0]], 'timestep': path1[i][1], 'type': 'vertex2.3.1'}
+                        
+                        # Vertex 2.1.1 – different speed, same location, same time (fast agent not following)
+                        if path1[i][0] == path2[j][0] and path1[i-1][0] != path2[j-1][0]:
+                            if path1[i][0] == path2[j][0] and path1[i-1][0] != path2[j-1][0]: # the previous step is not the same but the next one is
+                                print("VERTEX 2.1.1 (agent 2 is faster than agent 1)")
+                                # raise Exception("VERTEX 2.1.1 (agent 2 is faster than agent 1)")
+                                return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1], 'type': 'vertex2.1.1'}
+                        
+                        # Vertex 2.2.1 – different speed same location (slow agent waiting at location and fast passes through)
+                        if path2[j][0] == path2[j+1][0] == path1[i][0]:
+                            if path2[j][1] == path1[i][1]-0.25 and path2[j+1][1] == path1[i][1]+0.25: # if agent 1 is waiting and agent 2 is passing through
+                                print("VERTEX 2.2.1 (agent 1 is faster than agent 2)")
+                                # raise Exception("VERTEX 2.2.1 (agent 1 is faster than agent 2)")
+                                return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1], 'type': 'vertex2.2.1'}
+                            
+                    # Edge 2.1 – different speed and same edge
+                    if path1[i][1]>1 and path2[j][1]>1:
+                        if path1[i][1] == path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
+                            print("EDGE 2.1 (agent 1 is faster than agent 2)")
+                            # raise Exception("EDGE 2.1 (agent 1 is faster than agent 2)")
+                            return {'a1': agent1, 'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1], 'type': 'edge2.1'}
+
+        
+                if ac1.speed < ac2.speed: # if ac2 is faster
+                    
+                    if path1[i-1][1] == path2[j-1][1] - 0.25 and path1[i][1] == path2[j][1]: # if time is the same and the last step of agent 1 is 0.25 less than the last step of agent 2
+                        # Vertex 2.3.2 – different speed same location (fast agent follows slow agent and catches up)
+                        if path1[i-1][0] == path2[j-1][0] and path1[i][0] == path2[j][0]: # if the last 2 steps are the same.
+                            print("VERTEX 2.3.2 (agent 2 is faster than agent 1)")
+                            # raise Exception("VERTEX 2.3.2 (agent 2 is faster than agent 1)")
+                            return {'a1': agent1, 'a2': agent2, 'loc1': [path1[i-1][0]], 'loc2':[path1[i][0]], 'timestep': path1[i][1], 'type': 'vertex2.3.2'}
+
+                        # Vertex 2.1.2 – different speed, same location, same time (fast agent not following)
+                        if path1[i][0] == path2[j][0] and path1[i-1][0] != path2[j-1][0]: # the previous step is not the same but the next one is
+                            print("VERTEX 2.1.2 (agent 2 is faster than agent 1)")
+                            # raise Exception("VERTEX 2.1.2 (agent 2 is faster than agent 1)")
+                            return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1], 'type': 'vertex2.1.2'}
+
+                        # Vertex 2.2.2 – different speed same location (slow agent waiting at location and fast passes through)
+                        if path1[i][0] == path1[i+1][0] == path2[j][0]:
+                            if path1[i][1] == path2[j][1]-0.25 and path1[i+1][1] == path2[j][1]+0.25: # if agent 1 is waiting and agent 2 is passing through
+                                print("VERTEX 2.2.2 (agent 2 is faster than agent 1)")
+                                # raise Exception("VERTEX 2.2.2 (agent 2 is faster than agent 1)")
+                                return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1], 'type': 'vertex2.2.2'}
+
+                    # Edge 2.2 – different speed; reaching opposite nodes at the same time
+                    if (path1[i-1][1] == path2[j-1][1]-0.25 and path1[i][1] == path2[j][1] and      # if the agents leave their start nodes at different
+                        path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]):             # times but reach their goal nodes simultaneously
+                        print("EDGE 2.2 (agent 2 is faster than agent 1)")
+                        # raise Exception("EDGE 2.2 (agent 2 is faster than agent 1)")
+                        return {'a1': agent1, 'a2': agent2, 'loc1': [path1[i][0], path2[j][0]], 'loc2':[path2[j-2][0],path1[i][0]], 'timestep1': path1[i][1], 'timestep2':path1[i][1]-0.25, 'type': 'edge2.2'}
+
+                    # Edge 3.2 – different speed and same edge
+                    if (path1[i-1][1] == path2[j-1][1] and path1[i][1] == path2[j][1]+0.25 and      # if the agents leave their start nodes simultaneously
+                        path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]):             # but reach their goal nodes at different times
+                        # raise Exception("EDGE 3.2 (agent 2 is faster than agent 1)")
+                        return {'a1': agent1, 'a2': agent2, 'loc': [path2[j][0], path1[i][0]], 'timestep1': path1[i][1], 'timestep2':path2[j][1], 'type': 'edge3.2'}
+
+    # for i in range(len(path1)):
+    #     for j in range(len(path2)):
+    #         # if path1[i][1]==path2[j][1] and path1[i][0]==path2[j][0]:                
+    #         #     if ac1.speed == ac2.speed:
+    #         #         print("vertex collision1")
+    #         #         return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1]}
+    #         if path1[i][1] >= path2[j][1] > path1[i-1][1] and path1[i][0] == path2[j][0]:
+    #             if path1[i][1] == path2[j][1]:
+    #                 print("vertex collision 2.1")    
+    #             elif path1[i][1] > path2[j][1]:
+    #                 print("vertex collision 2.2")
+    #             # raise Exception(path1[i][1], ">", path2[j][1], ">", path1[i-1][1])
+    #             # if ac1.speed != ac2.speed: # this should be obvious, but we need to check that the speeds are different
+    #             return {'a1': agent1, 'a2': agent2, 'loc': [path1[i][0]], 'timestep': path1[i][1]}
+    #         elif path2[j][1] >= path1[i][1] > path2[j-1][1] and path1[i][0] == path2[j][0]:
+    #             print("vertex collision3")
+    #             raise Exception("AC1 gets to ac2's location while AC2 is waiting")
+
+    # # Edge collisions
+    #         if path1[i][1]>1 and path2[j][1]>1: # THIS USED TO BE >=1 ON BOTH SIDES BUT I CHANGED IT SO THEY DON'T SEE THE FIRST STEP AS AN EDGE COLLISION WHEN THEIR GOALS AND STARTS ARE INVERSELY THE SAME
+    #             if path1[i][1]==path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
+    #                 print("edge collision1")
+    #                 return {'a1': agent1,'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1]}
+
+    #             # Speed-based edge collisions
+    #             else:
+    #                 # raise Exception("Making speed-based edge collisions")
+    #                 if ac1.speed > ac2.speed:
+    #                     if path1[i][1]+0.25==path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
+    #                     # raise Exception("Making speed-based edge collisions where ac1 is faster than ac2")
+    #                         print("edge collision2")
+    #                         return {'a1': agent1,'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path1[i][1]}
+    #                 elif ac1.speed < ac2.speed:
+    #                     if path1[i][1]-0.25==path2[j][1] and path1[i-1][0] == path2[j][0] and path1[i][0] == path2[j-1][0]:
+    #                         print("edge collision3")
+    #                         return {'a1': agent1,'a2': agent2, 'loc': [path1[i-1][0], path1[i][0]], 'timestep': path2[j][1]}
+
+    # # # Two aircraft using the same runway
+    # if path1[-1][1]==path2[-1][1] and ((path1[-1][0]==1 or path1[-1][0]==2) and (path2[-1][0]==1 or path2[-1][0]==2)):
+        
+    #     # Determining when two aircraft intend to use the same runway, at the same time
+    #     if agent1<agent2:
+
+    #         return {'a1': agent2, 'a2': agent2, 'loc': [path2[-1][0]], 'timestep': path2[-1][1]}
+    #     else:
+    #         return {'a1': agent1, 'a2': agent1, 'loc': [path1[-1][0]], 'timestep': path1[-1][1]}
 
 
     # Dead lock at the gates
@@ -137,8 +185,8 @@ def detect_collisions(paths,t,ac_list):
 
     for agent1 in range(len(paths)):
         for agent2 in range(agent1, len(paths)):
-            print("detecting collision between agent {} and agent {}".format(agent1, agent2))
             if agent1 != agent2 and len(paths[agent1])>0 and len(paths[agent2])>0:
+                print("detecting collision between agent {} and agent {}".format(agent1, agent2))
                 if detect_collision(paths[agent1], paths[agent2], paths[agent1][0][2], paths[agent2][0][2],t, ac_list):
                     # Appending the collisions that were identified;
                     # paths[agent1][0][2] and paths[agent2][0][2] were used to extract the correct id of the agents
@@ -147,7 +195,7 @@ def detect_collisions(paths,t,ac_list):
                     print("!!!Collision detected between agent {} and agent {}".format(agent1, agent2))
                     first_collisions.append(detect_collision(paths[agent1], paths[agent2], paths[agent1][0][2], paths[agent2][0][2],t, ac_list))
             else:
-                print("No collision detected between agent {} and agent {}".format(agent1, agent2))
+                if agent1 != agent2: print("No collision detected between agent {} and agent {}".format(agent1, agent2))
 
     return first_collisions
 
@@ -165,27 +213,107 @@ def standard_splitting(collision):
     return_list = []
     agent1 = collision.get('a1')
     agent2 = collision.get('a2')
-    timestep = collision.get('timestep')
+    collision_type = collision.get('type')
+    
+    if collision_type not in ['edge2.1','edge2.2','edge3.1','edge3.2']:  # Edge collisions of type 2 & 3 have 2 separate time steps.
+       timestep = collision.get('timestep')
+        
+    # Vertex collisions
+        # Agents have the same speed
 
-    # Vertex collision
-    if len(collision.get('loc')) == 1:  # if the location is only one element long, then we are dealing with a vertex collision
-        print("Vertex collision detected")
+    if collision_type == 'vertex1': # Vertex 1
         location = collision['loc']
         return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
         return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep})
+        raise Exception("VERTEX 1 collision detected :: constraints generated: {}".format(return_list))
 
-    # Edge collision
-    if len(collision.get('loc')) == 2:  # if the location is two elements long, then we are dealing with an edge collision
-        print("Edge collision detected")
+        # Agent 1 is faster than agent 2
+
+    elif collision_type == 'vertex2.1.1': # Vertex 2.1.1
         location = collision['loc']
-        # if collision.get('rear_collision') is not None:
-        #     if collision.get('rear_collision') == agent1:
-        #         return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
-        #     elif collision.get('rear_collision') == agent2:
-        #         return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep})
         return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
-        return_list.append({'agent': agent2, 'loc': [location[-1], location[0]], 'timestep': timestep}) # reverse edge
+        return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep})
+        raise Exception("VERTEX 2.1.1 collision detected :: constraints generated: {}".format(return_list))
+    
+    elif collision_type == 'vertex2.2.1': # Vertex 2.2.1
+        pass
+    
+    elif collision_type == 'vertex2.3.1': # Vertex 2.3.1
+        location1 = collision['loc1']; location2 = collision['loc2']
+        return_list.append({'agent': agent2, 'loc': location1, 'timestep': timestep}) # Agent 2 cannot wait for agent 1 to pass through
+        return_list.append({'agent': agent1, 'loc': location2, 'timestep': timestep}) # Agent 1 cannot be at agent2's final location
+        raise Exception("VERTEX 2.3.1 collision detected :: constraints generated: {}".format(return_list))
+    
+        # Agent 2 is faster than agent 1
 
+    elif collision_type == 'vertex2.1.2': # Vertex 2.1.2
+        location = collision['loc']
+        return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
+        return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep})
+        raise Exception("VERTEX 2.1.2 collision detected :: constraints generated: {}".format(return_list))
+    
+    elif collision_type == 'vertex2.2.2': # Vertex 2.2.2
+        pass
+    
+    elif collision_type == 'vertex2.3.2': # Vertex 2.3.2
+        location1 = collision['loc1']; location2 = collision['loc2']
+        return_list.append({'agent': agent1, 'loc': location1, 'timestep': timestep}) # Agent 1 cannot wait for agent 2 to pass through
+        return_list.append({'agent': agent2, 'loc': location2, 'timestep': timestep}) # Agent 2 cannot be at agent1's final location
+        raise Exception("VERTEX 2.3.2 collision detected :: constraints generated: {}".format(return_list))
+
+    # Edge collisions
+        # Agents have the same speed
+    elif collision_type == 'edge1': # Edge 1
+        location = collision['loc']
+        return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
+        return_list.append({'agent': agent2, 'loc': [location[-1], location[0]], 'timestep': timestep})
+        raise Exception("EDGE 1 collision detected :: constraints generated: {}".format(return_list))
+
+        # Agent 1 is faster than agent 2
+    elif collision_type == 'edge2.1': # Edge 2.1
+        pass
+
+    elif collision_type == 'edge3.1': # Edge 3.1
+        pass
+
+        # Agent 2 is faster than agent 1
+    elif collision_type == 'edge2.2': # Edge 2.2
+        location1 = collision['loc1']; location2 = collision['loc2']
+        timestep1 = collision['timestep1']; timestep2 = collision['timestep2']
+        return_list.append({'agent': agent2, 'loc': location1, 'timestep': timestep1}) # Agent 2 cannot go to Agent1's starting location at t
+        return_list.append({'agent': agent2, 'loc': location2, 'timestep': timestep2}) # Agent 2 cannot go to Agent1's final location at t-0.25
+        raise Exception("EDGE 2.2 collision detected :: constraints generated: {}".format(return_list))
+    
+    elif collision_type == 'edge3.2': # Edge 3.2
+        location = collision['loc']
+        timestep1 = collision['timestep1']; timestep2 = collision['timestep2']
+        return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep1})                       # Agent 1 cannot go to Agent2's starting location at t[agent1]
+        return_list.append({'agent': agent2, 'loc': [location[-1], location[0]], 'timestep': timestep2})    # Agent 2 cannot go to Agent1's starting location at t[agent2] –– t[agent2] == t[agent1] - 0.25
+        raise Exception("EDGE 3.2 collision detected :: constraints generated: {}".format(return_list))
+
+
+
+
+    # Vertex collision
+    # if len(collision.get('loc')) == 1:  # if the location is only one element long, then we are dealing with a vertex collision
+    #     # print("Vertex collision detected")
+    #     location = collision['loc']
+    #     return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
+    #     return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep})
+
+    # # Edge collision
+    # if len(collision.get('loc')) == 2:  # if the location is two elements long, then we are dealing with an edge collision
+    #     # print("Edge collision detected")
+    #     location = collision['loc']
+    #     if ac1.speed > ac2.speed:
+    #         return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
+    #     elif ac1.speed < ac2.speed:
+    #         return_list.append({'agent': agent2, 'loc': [location[-1], location[0]], 'timestep': timestep})
+    #     else:
+    #         return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep})
+    #         return_list.append({'agent': agent2, 'loc': [location[-1], location[0]], 'timestep': timestep}) # reverse edge
+
+    print("Generated constraints:", return_list)
     return return_list
 
 class CBSSolver(object):
@@ -211,11 +339,17 @@ class CBSSolver(object):
     def push_node(self, node):
         heapq.heappush(self.open_list, (node['cost'], len(node['collisions']), self.num_nodes_generated, node))
         print("Generate node: {}".format(self.num_nodes_generated))
+        print("Open list:")
+        for i in range(len(self.open_list)):
+            print("Node", self.open_list[i][2], ":", self.open_list[i])
         self.num_nodes_generated += 1
+        if self.num_nodes_generated >= 1000:
+            raise Exception("Too many nodes: {}".format(self.num_nodes_generated))
 
     def pop_node(self):
         _, _, id, node = heapq.heappop(self.open_list)
         print("Expand node: {}".format(id))
+        print(node)
         self.num_nodes_expanded += 1
         return node
     
@@ -253,7 +387,7 @@ class CBSSolver(object):
                     ac.last_node = path[0][0]
                     
                     # storing the path of the agent in the list of paths that still need to be completed
-                    print("agent:", agent)
+                    # print("agent:", agent)
                     paths_to_go[agent] = path
                     # print("paths to go:",paths_to_go, "\nLength of paths to go:", len(paths_to_go))
                     existent_paths[agent] = path
@@ -283,7 +417,6 @@ class CBSSolver(object):
         self.push_node(root)  # and we add the root node to the list
 
         # print("Root node pushed to open list:", root)
-        print("Open list:", self.open_list)
 
         while len(self.open_list) > 0: # while there are still nodes in the open list
             P = self.pop_node()  # we pop the node with the lowest cost from the open list
@@ -317,42 +450,38 @@ class CBSSolver(object):
                 return new_paths
             
             collision = P['collisions'][0]
+            # print("collision:", collision)  
             collisions.append(collision) 
 
-            constraints_new = standard_splitting(collision)  
+            constraints_new = standard_splitting(collision)  # we split the collision into constraints
 
-            print("constraints_new:", constraints_new)
+            # print("constraints_new:", constraints_new)
 
             for constraint in constraints_new:
+
                 constraints.append(constraint)
 
                 # initiailisng the node Q
                 Q = {'cost': 0, 'constraints': [], 'paths': [], 'collisions': []}
 
                 Q['constraints'] = copy.deepcopy(P['constraints'])
-                print("after deep copy init")
-                print("Q['constraints']:", Q['constraints'])
-                print("P['constraints']:", P['constraints'])
 
 
                 if constraint not in Q['constraints']:
-                    print('made it here')
                     Q['constraints'].append(constraint)
-                    print("Q['constraints']:", Q['constraints'])
 
                 Q['paths'] = copy.deepcopy(P['paths'])
                 agent = constraint['agent']
 
-                print("Q['paths']:", Q['paths'], "Agent:", agent)
 
 
                 # THIS IS WHERE YOU'LL NEED TO CHANGE THE PATHS TO THE PREDICTED PATHS
                 start = 0
-                for current_location in current_location_aircraft: # THIS LIST IS EMPTY... WHY?
-                    print("current_location:", current_location, "agent:", agent, "t:", self.t)
+                for current_location in current_location_aircraft: 
+                    # print("current_location:", current_location, "agent:", agent, "t:", self.t)
                     if current_location[1] == self.t and current_location[2] == agent:
                         start = current_location[0]    
-                        print("start:", start)
+                        # print("start:", start)
 
 
                 for ac in self.aircraft_lst:
@@ -360,11 +489,13 @@ class CBSSolver(object):
                         if start != 0:
                             path_so_far = []
                             for element in existent_paths[agent]:
-                                if element[1] <= self.t:
+                                if element[1] < self.t:
                                     path_so_far.append(element) # creating a list with the path that was completed so far by the agent,
                                                                 # to use it for replanning purposes
-                                    
+                            
+                            # print("running complex astar")
                             success, path = complex_single_agent_astar(self.nodes_dict, start, self.goals[agent], self.heuristics, self.t, agent, ac.speed, Q['constraints'], path_so_far)
+
 
                             if path is not None and len(path)>0:
                                 path_so_far = []

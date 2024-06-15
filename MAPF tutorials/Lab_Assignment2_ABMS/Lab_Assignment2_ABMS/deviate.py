@@ -1,8 +1,4 @@
-"""
-IMPORTS
-"""
 import random as rd
-
 
 """
 MAIN FUNCTIONS
@@ -24,14 +20,13 @@ def detect_deviation(ac_list, nodes_dict, t):
             next_node_pos = nodes_dict[ac.path_to_goal[0][0]]["xy_pos"] # position of next node in the plan    
             if ac.position == next_node_pos and ac.path_to_goal[0][1] != t: # at node but not at the right time
                 print("AC{} too early".format(ac.id)) 
-                # ac.replanning = True      # not being used now
+                
                 return True
             elif ac.position != next_node_pos and ac.path_to_goal[0][1] == t: # not at the node when it is time to be there
                 print("AC{} too late".format(ac.id))
-                # ac.replanning = True      # not being used now
+                
                 return True
-            # ac.plan_independent(nodes_dict, edges_dict, heuristics, t) 
-    
+            
     return False # no deviation detected
 
 
@@ -83,17 +78,44 @@ def run_independent_replanner(ac_list,nodes_dict, edges_dict, heuristics, t):
                 ac.replanning == False
             ac.plan_independent(nodes_dict, edges_dict, heuristics, t) # plan the path
             ac.replanning = False
-            # ac.plan_independent(nodes_dict, edges_dict, heuristics, t)
+
+
+def aircraft_infront(ac_list, t):
+    """
+    INPUT:
+        - ac_list = [list] list of aircraft objects
+        - nodes_dict = [dict] dictionary with nodes and node properties
+        - t = [int] current timestep
+    RETURNS:
+        - Modifies an agent's speed if it detects that there is an aircraft 1 node in front of it.
+
+    This is a sort of speed profile that applies universally to the agents. It is a form of local adjustment
+    to avoid rear-end collisions in a semi-realistic way.
+    """
+    for ac1 in ac_list:
+        for ac2 in ac_list:
+            if ac1.status == 'taxiing' and ac2.status == 'taxiing':
+                if ac1.speed > ac2.speed: # if ac1 is faster than ac2
+                    if calculate_distance(ac1.position, ac2.position) <= 0.5: # we check that the distance between them is <= 0.5
+                        ac1.speed = 1
+                        print("AC{} is slowing down to speed {} to match AC{}".format(ac1.id, ac1.speed, ac2.id))
+                        # raise Exception("AC{} is faster than AC{} and is too close".format(ac1.id, ac2.id))
+
+                elif ac1.speed < ac2.speed: # if ac2 is faster than ac1
+                    if calculate_distance(ac1.position, ac2.position) <= 0.5: # we check that the distance between them is <= 0.5
+                        # we also need to check that ac2 is BEHIND but one step at a time.
+                        ac2.speed = 1
+                        print("AC{} is slowing down to speed {} to match AC{}".format(ac2.id, ac2.speed, ac1.id))
+                        # raise Exception("AC{} is faster than AC{} and is too close".format(ac2.id, ac1.id))
+
             
-    # raise Exception("Replanning not finished yet")
-    # when this exception is removed, the program for some reason needs to keep replanning.
-    # It is likely that you have to change the ac.replanning = True to ac.replanning = False 
+            
             
 """
 UTILITY FUNCTIONS
 """
 
-def is_waiting(ac_list,nodes_dict):
+def is_waiting(ac_list, nodes_dict): 
     """
     INPUT:
         - ac_list = [list] list of aircraft objects
@@ -124,6 +146,7 @@ def is_it_a_node(position, nodes_dict, retrieve_node=False):
         - nodes_dict = [dict] dictionary with nodes and node properties
     RETURNS:
         - BOOL: True if agent is at a node, False if agent is not at a node
+        - node: if retrieve_node is True, returns the node at which the agent is located
     """
 
     for node in nodes_dict:
@@ -132,6 +155,7 @@ def is_it_a_node(position, nodes_dict, retrieve_node=False):
                 return node
             return True
     return False
+
 
 def calculate_distance(ac_position, next_node_position):
     """

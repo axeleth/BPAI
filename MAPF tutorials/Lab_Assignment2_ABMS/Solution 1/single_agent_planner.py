@@ -329,6 +329,52 @@ def complex_single_agent_astar(nodes_dict, from_node, goal_node, heuristics, tim
     return False, [] # Failed to find solutions
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def complex_single_agent_astar_1(nodes_dict, from_node, goal_node, heuristics, time_start, agent, constraints, path_so_far):
     """
     #### This version of the a_star algorithm is used for Individual planning ####

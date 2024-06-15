@@ -59,7 +59,7 @@ def find_time_step_size(speed, dt=0.01):
 
 def build_constraint_table(constraints, agent):
     """Generates a table of constraints for an agent"""
-
+    print("BUILDING CONSTRAINT TABLE")
     return_table = []
 
     for constraint in constraints:
@@ -67,7 +67,7 @@ def build_constraint_table(constraints, agent):
         # next entry in the array consisting of the constraints (dictionaries)
         if constraint['agent'] != agent:
             continue
-        print('constraint:', constraint)
+        print('constraint {} for agent {}:'.format(constraint, agent))
         time_step = constraint['timestep']
 
         # preparation for the edge constraints. returns a tuple within tuple ((location 1), (location N))
@@ -88,10 +88,11 @@ def build_constraint_table(constraints, agent):
 
     if len (return_table) != 0:
         return_table = return_table[return_table[:,0].argsort()] # this gives the sorted constraint table
-
+    
+    print("CONSTRAINT RETURN TABLE:", return_table)
     return return_table
 
-def is_constrained(curr_loc, next_loc, next_time, constraint_table):
+def is_constrained(curr_loc, next_loc, next_time, constraint_table, speed):
     """
     Decides whether a certain movement is constrained or not.
     INPUT:
@@ -111,14 +112,21 @@ def is_constrained(curr_loc, next_loc, next_time, constraint_table):
         if len(i[1])==1:
             time_step = i[0]
             constraint_location = i[1][0]
+            # print("looking at vertex constraint:", i)
             if constraint_location == next_loc and next_time == time_step:  # if there exists a vertex constraint for the
                                                                             # next location and next timestep
                 switch = True  # then the movement should be constrained
         # Checking edge constraints.
         if len(i[1])!=1:  # if the length of the location of the constraint is different than 1 (namely equal to 2),
                           # then we are dealing with an edge constraint
+            # print("Exploring Constraint:", i)
+            # print("Time:", i[0], '==', next_time)
+            # print('location1:', curr_loc, '==', i[1][0])
+            # print('location2:', next_loc, '==', i[1][1])
+            # print(speed)
+            
             time_step = i[0]
-            if time_step != next_time:
+            if time_step != next_time: #  and time_step != next_time - find_time_step_size(speed)
                 continue
             constraint_location1 = i[1][0]
             # raise Exception('constraint_location1:', constraint_location1, 'curr_loc:', curr_loc)
@@ -161,6 +169,7 @@ def complex_single_agent_astar(nodes_dict, from_node, goal_node, heuristics, tim
         possible_positions.add(curr['loc']) # adding the current node to the list of possible positions so the agent has the option of waiting
 
         for neighbor in possible_positions:
+            # print("NEIGHBOR:", neighbor)
 
             # Check whether the new child nodes violates any constraints set by other agents. We check whether the
             # constraint is true, and if so, we discard this child node and move on to the next node using 'continue'.
@@ -184,6 +193,7 @@ def complex_single_agent_astar(nodes_dict, from_node, goal_node, heuristics, tim
                         back = 1
 
             if back == 1:
+                # print("neighbor is behind")
                 continue
 
             # checking that the aircraft doesn't wait for an arbitrary amount of timesteps in a loction and only then
@@ -196,19 +206,21 @@ def complex_single_agent_astar(nodes_dict, from_node, goal_node, heuristics, tim
                     back = 1
                     position = path[k+1][0]
                     i = 2
-                    time_step = time_1 + find_time_step_size(speed) # CHECK IF THIS CAUSES AN ERROR
+                    time_step = time_1 + find_time_step_size(speed) 
                     while time_step < time_2:
                         if path[k+i][0] != position:
                             back = 0
                         i += 1
-                        time_step += find_time_step_size(speed) # CHECK IF THIS CAUSES AN ERROR
+                        time_step += find_time_step_size(speed) 
 
             if back == 1:
+                # print("waiting for too long")
                 continue
 
             back = 0
 
-            if is_constrained(curr['loc'], neighbor, round(curr['timestep'] + find_time_step_size(speed),2), constraint_table) or back == 1:
+            if is_constrained(curr['loc'], neighbor, round(curr['timestep'] + find_time_step_size(speed),2), constraint_table,speed) or back == 1:
+                print("Neighbor {} is constrained".format(neighbor))
                 continue
 
             child = {
@@ -227,6 +239,8 @@ def complex_single_agent_astar(nodes_dict, from_node, goal_node, heuristics, tim
             else:
                 closed_list[(child['loc'], child['timestep'])] = child
                 push_node(open_list, child)
+
+            print("Path found for agent {}: {}".format(agent, get_path(child, agent)))
 
     print("No path found, "+str(len(closed_list))+" nodes visited")
     return False, [] # Failed to find solutions
@@ -315,7 +329,7 @@ def simple_single_agent_astar(nodes_dict, from_node, goal_node, heuristics, time
                     back = 1
 
 
-            if is_constrained(curr['loc'], neighbor, round(curr['timestep'] + find_time_step_size(speed),2), constraint_table) or back == 1:
+            if is_constrained(curr['loc'], neighbor, round(curr['timestep'] + find_time_step_size(speed),2), constraint_table,speed) or back == 1:
                 continue
 
             child = {'loc': neighbor,

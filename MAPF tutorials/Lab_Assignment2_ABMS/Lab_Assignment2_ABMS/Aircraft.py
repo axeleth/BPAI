@@ -91,7 +91,7 @@ class Aircraft(object):
             x_normalized = 0
             y_normalized = y / math.sqrt(x ** 2 + y ** 2)
             self.waiting = False
-        elif x == 0 and y==0:
+        elif x == 0 and y==0: # stand still
             x_normalized = 0
             y_normalized = 0
             self.waiting = True
