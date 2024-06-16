@@ -128,15 +128,16 @@ def is_waiting(ac_list, nodes_dict):
     aircraft's internal move function will reset this attribute to False.
     """
     for ac in ac_list:
-        from_node = ac.from_to[0]
-        to_node = ac.from_to[1]
-        xy_from = ac.nodes_dict[from_node]["xy_pos"] #xy position of from node
-        xy_to = ac.nodes_dict[to_node]["xy_pos"] #xy position of to node
-        x = xy_to[0]-xy_from[0]
-        y = xy_to[1]-xy_from[1]
+        if ac.status == 'taxiing':
+            from_node = ac.from_to[0]
+            to_node = ac.from_to[1]
+            xy_from = ac.nodes_dict[from_node]["xy_pos"] #xy position of from node
+            xy_to = ac.nodes_dict[to_node]["xy_pos"] #xy position of to node
+            x = xy_to[0]-xy_from[0]
+            y = xy_to[1]-xy_from[1]
 
-        if x==0 and y == 0:
-            ac.waiting = True
+            if x==0 and y == 0:
+                ac.waiting = True
         
 
 def is_it_a_node(position, nodes_dict, retrieve_node=False):

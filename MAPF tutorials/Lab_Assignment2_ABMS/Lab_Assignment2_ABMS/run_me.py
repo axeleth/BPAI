@@ -14,7 +14,7 @@ from visualization import map_initialization, map_running
 from Aircraft import Aircraft
 from independent import run_independent_planner
 from prioritized import run_prioritized_planner
-from cbs import CBSSolver, run_CBS
+from cbs import CBSSolver
 from deviate import *
 
 #%% SET SIMULATION PARAMETERS
@@ -161,7 +161,7 @@ time_end = simulation_time
 dt = 0.05 #should be factor of 0.5 (0.5/dt should be integer)
 t= 0
 
-timesteps = [1,1]
+timesteps = [1,1.5,2,2,2.5]
 
 # LUT_TL = initialise lookup table for ac spawn times and locations HERE
 constraints = []  # constraint list init
@@ -182,7 +182,8 @@ new_aircraft = False
 print("Simulation Started")
 while running:
     t= round(t,2)
-    print("Time: ", t)
+    if t%1 == 0:
+        print("Time: ", t)
 
     #Check conditions for termination
     if t >= time_end or escape_pressed:
@@ -205,27 +206,30 @@ while running:
 
     #Spawn aircraft for this timestep (use for example a random process)
     if t == 1 :
-        ac0 = Aircraft(0, 'D', 37,97,1,t, nodes_dict) #As an example we will create one aicraft arriving at node 37 with the goal of reaching node 36
+        ac0 = Aircraft(0, 'D', 24,37,1,timesteps[0], nodes_dict) #As an example we will create one aicraft arriving at node 37 with the goal of reaching node 36
         aircraft_lst.append(ac0)
         starts.append(ac0.start)
         goals.append(ac0.goal)
 
-        ac1 = Aircraft(1, 'D', 97,37,2,t, nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
+        ac1 = Aircraft(1, 'D', 97,2,2,timesteps[1], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
         aircraft_lst.append(ac1)
         starts.append(ac1.start)
         goals.append(ac1.goal)
-        # CAN ALSO ADD A LOOKUP TABLE FOR STARTS AT A TIME TO SEE THAT AGENTS DON'T SPAWN ON TOP OF EACH OTHER
 
-        # ac2 = Aircraft(2, 'D', 34,38,1,t, nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
-        # aircraft_lst.append(ac2)
-        # starts.append(ac2.start)
-        # goals.append(ac2.goal)
+        ac2 = Aircraft(2, 'D', 36,37,1,timesteps[2], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
+        aircraft_lst.append(ac2)
+        starts.append(ac2.start)
+        goals.append(ac2.goal)
 
-        # ac3 = Aircraft(3, 'D', 35,2,1,t, nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
-        # aircraft_lst.append(ac3)
-        # starts.append(ac3.start)
-        # goals.append(ac3.goal)
+        ac3 = Aircraft(3, 'D', 33,37,1,timesteps[3], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
+        aircraft_lst.append(ac3)
+        starts.append(ac3.start)
+        goals.append(ac3.goal)
 
+        ac4 = Aircraft(4, 'A', 1,35,2,timesteps[4], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
+        aircraft_lst.append(ac4)
+        starts.append(ac4.start)
+        goals.append(ac4.goal)
         # aircraft_lst.append(ac1)
 
     # random spawner:
@@ -249,12 +253,12 @@ while running:
 
     #Do planning
     if planner == "CBS":
-            if t == 1:
+            if t in timesteps:
                 for ac in aircraft_lst:
                     if ac.spawntime == t:
                         ac.status = "taxiing"
                         ac.position = nodes_dict[ac.start]["xy_pos"]
-                        print("AC{} has spawned at time {}".format(ac.id, t))
+                        # print("AC{} has spawned at time {}".format(ac.id, t))
 
                 current_node = 0
                 current_location_aircraft = [] # this will append the current location of each taxiing agent at the given t
