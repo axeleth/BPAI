@@ -233,6 +233,7 @@ def standard_splitting(collision):
     
     elif collision_type == 'vertex2.2.2': # Vertex 2.2.2
         location = collision['loc']
+        timestep1 = collision['timestep1']; timestep2 = collision['timestep2']
         return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep2})
         return_list.append({'agent': agent2, 'loc': location, 'timestep': timestep1})
         return_list.append({'agent': agent1, 'loc': location, 'timestep': timestep2}) 
@@ -313,7 +314,7 @@ class CBSSolver(object):
         # for i in range(len(self.open_list)):
         #     print("Node", self.open_list[i][2], ":", self.open_list[i])
         self.num_nodes_generated += 1
-        if self.num_nodes_generated >= 500:
+        if self.num_nodes_generated >= 8000:
             raise Exception("Too many nodes: {}".format(self.num_nodes_generated))
 
     def pop_node(self):
@@ -323,7 +324,7 @@ class CBSSolver(object):
         self.num_nodes_expanded += 1
         return node
     
-    def find_solution(self, constraints, existent_paths, current_location_aircraft, collisions, time_start, original_path_lst):
+    def find_solution(self, constraints, existent_paths, current_location_aircraft, collisions, time_start, original_path_lst, an_aircraft_deviated):
         
         print("**RUNNING CBS PLANNER AT TIME {}**".format(self.t))
 
@@ -345,11 +346,15 @@ class CBSSolver(object):
 
                 ac.plan_independent(self.nodes_dict, self.edges_dict, self.heuristics, self.t)  # first, plan the paths without
                                                                                                 # any constraints
-                original_path = ac.path_to_goal
-                original_path_lst.append((len(original_path) + 1)/2 - 0.5) # THIS MIGHT NEED THE TIME STEP SIZE CALCULATOR!
-                # root['paths'].append(ac.path_to_goal)
+                
+                original_path = ac.path_to_goal                             
+                original_path_lst.append((len(original_path) + 1))
+                
+
                 # storing in "path" the initial path of the ac, which is computed without any constraints
                 # root['constraints'] is still empty at this point.
+
+                # print("Agent:", agent, "doing the first A* plan!")
                 success, path = complex_single_agent_astar(self.nodes_dict, start_node, goal_node, self.heuristics, self.t, agent, ac.speed, root['constraints'], path_so_far)
 
                 if success:
@@ -375,13 +380,65 @@ class CBSSolver(object):
                 if path is None:
                     raise Exception("No solutions")
                 
-        for ac in self.aircraft_lst:
-            if ac.status == 'taxiing' and ac.spawntime != self.t:
+        for ac in self.aircraft_lst: # if an aircraft has deviated
+            if ac.status == 'taxiing' and ac.spawntime != self.t and ac.deviated == True:
+                agent = ac.id
+                for location in current_location_aircraft:
+                    if location[2] == agent:
+                        ac_location = location
+                        start_node = location[0]
+                        start_time = location[1]
+                goal_node = ac.goal
+                path_so_far = []
+                last_node = ac.from_to[0] # in case of an agent slowing down
+                # print("Ac,",ac.id,"paths to go:",paths_to_go[ac.id], "\nLength of paths to go:", len(paths_to_go[ac.id]))
+
+                # Plan without constraints from new start position!
+
+                # raise Exception("about to run initial A* replanner on agent {} with the following data:\nstart_node = {}\nstart_time = {}, goal_node = {}\n location from list = {}".format(agent, start_node, start_time, goal_node, ac_location))
+                success, path = complex_single_agent_astar(self.nodes_dict, start_node, goal_node, self.heuristics, start_time, agent, ac.speed, root['constraints'], path_so_far)
+
+                if success:
+                    if ac.deviation_type == 'early':
+                        ac.last_node = path[0][0]
+                        next_node_id = ac.path_to_goal[0][0] #next node is first node in path_to_goal
+                        ac.from_to = [path[0][0], next_node_id]
+                        ac.path_to_goal = path[1:]
+                    elif ac.deviation_type == 'late':
+                        ac.last_node = last_node
+                        next_node_id = ac.path_to_goal[1][0] #next node is first node in path_to_goal
+                        ac.from_to = [last_node, path[0][0]]
+                        ac.path_to_goal = path
+                    else:
+                        raise Exception("No deviation type found for", ac.id, "or deviation type is None")
+                    
+                    ac.deviated = False
+                    ac.deviation_type = None
+                    existent_paths[agent] = path
+                    root['paths'] = paths_to_go
+                    # raise Exception("Replan solution found for AC{}:\n official ac.path_to_goal: {}".format(ac.id, ac.path_to_goal))
+
+                else:
+                    raise Exception("No replan solution found for", ac.id)
+                
+                # check path
+                if path[0][1] != self.t:
+                    pass
+                    # raise Exception("Something is wrong with the timing of the path planning")
+                
+                if path is None:
+                    raise Exception("No solutions")
+
+                
+        for ac in self.aircraft_lst: # this is the part where we store the paths of the agents that are already taxiing when a new agent spawns
+            if ac.status == 'taxiing' and ac.spawntime != self.t and ac.deviated == False:
                 paths_to_go[ac.id]= [(ac.from_to[0], ac.from_to[1], ac.id)] + ac.path_to_goal
+                # print("Ac,",ac.id,"paths to go:",paths_to_go[ac.id], "\nLength of paths to go:", len(paths_to_go[ac.id]))
+        
 
                 
         
-        
+        # print("Paths to go that is added to root:", paths_to_go)
         root['paths'] = paths_to_go  # Then, we store all the paths_to_go in the root node
         root['cost'] = get_sum_of_cost(root['paths'])  # We compute the cost of the current solution/set of paths
         root['collisions'] = detect_collisions(root['paths'],self.t,self.aircraft_lst)  # Then, we store the collisons that take place in the paths
@@ -465,7 +522,7 @@ class CBSSolver(object):
                                     path_so_far.append(element) # creating a list with the path that was completed so far by the agent,
                                                                 # to use it for replanning purposes
                             
-                            # print("running complex astar")
+                            # print("Agent:", agent, "doing the second A* plan!")
                             success, path = complex_single_agent_astar(self.nodes_dict, start, self.goals[agent], self.heuristics, self.t, agent, ac.speed, Q['constraints'], path_so_far)
 
 
@@ -487,6 +544,7 @@ class CBSSolver(object):
                                 Q['collisions'] = detect_collisions(Q['paths'],self.t,self.aircraft_lst)
                                 Q['cost'] = get_sum_of_cost(Q['paths'])
 
+                                # ac.path_so_far = path_so_far
                                 self.push_node(Q)
 
         return "No Solutions"

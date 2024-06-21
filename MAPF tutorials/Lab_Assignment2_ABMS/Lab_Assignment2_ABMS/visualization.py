@@ -1,6 +1,5 @@
 """
 This file is used for visualization. No big changes should be required to this file.
-The only function that can be updated is map_running. You may add additional info to be printed such as a/c in the radar range yourself.
 Visualization code in this file is based on graduation work by K.Fines and T. Noortman.
 """
 

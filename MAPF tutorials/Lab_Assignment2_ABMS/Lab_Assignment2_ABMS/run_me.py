@@ -4,6 +4,8 @@ Run-me.py is the main file of the simulation. Run this file to run the simulatio
 
 import os
 import pandas as pd
+import numpy as np
+import statistics
 import networkx as nx
 import matplotlib.pyplot as plt
 import time as timer
@@ -23,13 +25,18 @@ nodes_file = "nodes.xlsx" #xlsx file with for each node: id, x_pos, y_pos, type
 edges_file = "edges.xlsx" #xlsx file with for each edge: from  (node), to (node), length
 
 #Parameters that can be changed:
-simulation_time = 20
+simulation_time = 35
 planner = "CBS" #choose which planner to use (currently only Independent is implemented)
 
 #Visualization (can also be changed)
 plot_graph = False    #show graph representation in NetworkX
 visualization = True        #pygame visualization
-visualization_speed = 0.05 #set at 0.1 as default (0.1 is very slow now because there are a lot more steps!)
+visualization_speed = 0.01 #set at 0.1 as default (0.1 is very slow now because there are a lot more steps!)
+
+
+
+#evaluation metrics
+cpu_time_list = []
 
 time_start = timer.time()
 
@@ -137,231 +144,279 @@ def create_graph(nodes_dict, edges_dict, plot_graph = True):
 
     return graph
 
-#%% RUN SIMULATION
-# =============================================================================
-# 0. Initialization
-# =============================================================================
-nodes_dict, edges_dict, start_and_goal_locations = import_layout(nodes_file, edges_file)
-graph = create_graph(nodes_dict, edges_dict, plot_graph)
-heuristics = calc_heuristics(graph, nodes_dict)
-
-aircraft_lst = []   #List which can contain aircraft agents
-
-if visualization:
-    map_properties = map_initialization(nodes_dict, edges_dict) #visualization properties
-
-# =============================================================================
-# 1. While loop and visualization
-# =============================================================================
-
-#Start of while loop
-running=True
-escape_pressed = False
-time_end = simulation_time
-dt = 0.05 #should be factor of 0.5 (0.5/dt should be integer)
-t= 0
-
-timesteps = [1,1.5,2,2,2.5]
-
-# LUT_TL = initialise lookup table for ac spawn times and locations HERE
-constraints = []  # constraint list init
-collisions = []  # collision list init
-
-existent_paths = [[] for i in range(len(timesteps))]    # initialising a list of lists to keep track of the existent paths of each agent
-                                                        # for the CBS and the Individual planner
+number_of_aircraft = 20
+runnumb = 1
+while runnumb <= 15:
 
 
-# result = []  # here the final results (in the form of a list of paths for each agent) are going to be stored
-starts = []  # the starting node for each agent is stored here
-goals = []   # the goal node for each agent is stored here
-original_path_lst = []  # the length of the original path (calculated without constraints) for each agent is stored here
+    #%% RUN SIMULATION
+    # =============================================================================
+    # 0. Initialization
+    # =============================================================================
+    nodes_dict, edges_dict, start_and_goal_locations = import_layout(nodes_file, edges_file)
+    graph = create_graph(nodes_dict, edges_dict, plot_graph)
+    heuristics = calc_heuristics(graph, nodes_dict)
 
-id = 0
-new_aircraft = False
+    aircraft_lst = []   #List which can contain aircraft agents
+    cpu_time_list = []  #List which can contain cpu times of the planner
 
-print("Simulation Started")
-while running:
-    t= round(t,2)
-    if t%1 == 0:
-        print("Time: ", t)
-
-    #Check conditions for termination
-    if t >= time_end or escape_pressed:
-        running = False
-        pg.quit()
-        print("Simulation Stopped")
-        break
-
-    #Visualization: Update map if visualization is true
     if visualization:
-        current_states = {} #Collect current states of all aircraft
-        for ac in aircraft_lst:
-            if ac.status == "taxiing":
-                current_states[ac.id] = {"ac_id": ac.id,
-                                         "xy_pos": ac.position,
-                                         "heading": ac.heading}
-        escape_pressed = map_running(map_properties, current_states, t)
-        timer.sleep(visualization_speed)
-        # print(current_states)
+        map_properties = map_initialization(nodes_dict, edges_dict) #visualization properties
 
-    #Spawn aircraft for this timestep (use for example a random process)
-    if t == 1 :
-        ac0 = Aircraft(0, 'D', 24,37,1,timesteps[0], nodes_dict) #As an example we will create one aicraft arriving at node 37 with the goal of reaching node 36
-        aircraft_lst.append(ac0)
-        starts.append(ac0.start)
-        goals.append(ac0.goal)
+    # =============================================================================
+    # 1. While loop and visualization
+    # =============================================================================
 
-        ac1 = Aircraft(1, 'D', 97,2,2,timesteps[1], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
-        aircraft_lst.append(ac1)
-        starts.append(ac1.start)
-        goals.append(ac1.goal)
+    #Start of while loop
+    running=True
+    escape_pressed = False
+    time_end = simulation_time
+    dt = 0.05 #should be factor of 0.5 (0.5/dt should be integer)
+    t= 0 
 
-        ac2 = Aircraft(2, 'D', 36,37,1,timesteps[2], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
-        aircraft_lst.append(ac2)
-        starts.append(ac2.start)
-        goals.append(ac2.goal)
+    max_spawntime = 20  # maximum spawntime for the aircraft
+    # number_of_aircraft = 6  # number of aircraft to spawn
+    timesteps = [] # timesteps at which the aircraft spawn
 
-        ac3 = Aircraft(3, 'D', 33,37,1,timesteps[3], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
-        aircraft_lst.append(ac3)
-        starts.append(ac3.start)
-        goals.append(ac3.goal)
+    for i in range(0, number_of_aircraft):
+        random_timestep = rd.randint(1, max_spawntime)
+        while timesteps.count(random_timestep) >= 6:  # Ensuring that a timestep cannot be repeated more than 6 times in the list because
+                                                # a maximum of 6 aircraft (5 departing and 1 arriving) can be spawned at the same timestep
+            random_timestep = rd.randint(1, max_spawntime)
 
-        ac4 = Aircraft(4, 'A', 1,35,2,timesteps[4], nodes_dict)#As an example we will create one aicraft arriving at node 36 with the goal of reaching node 37
-        aircraft_lst.append(ac4)
-        starts.append(ac4.start)
-        goals.append(ac4.goal)
-        # aircraft_lst.append(ac1)
+        timesteps.append(random_timestep)  # this determines when the aircraft will spawn
 
-    # random spawner:
-    # if t <= 10 and t%0.25 == 0: # every 0.25 seconds until t = 10
-    #     if rd.random() < 0.2: # 20% chance
-    #         id, a_d, start, goal, speed, spawn_time = spawner(t, id)
-    #         aircraft_lst.append(Aircraft(id, a_d, start, goal, speed, spawn_time, nodes_dict))
+    timesteps = sorted(timesteps)  # ensuring that the timesteps are in chronological order
 
-    # this is a super simple deviation example hopefully it will turn into a speed profile...
-    DEVIATE = False
-    if DEVIATE and t == 2: # at time 5.5
 
-        for ac in aircraft_lst:
-            if ac.id == 0:
-                ac.speed = 2
+    look_up_table_times_locations = []  # this list is used for preventing aircraft to spawn at the same time at the same location
+    constraints = []  # constraint list init
+    collisions = []  # collision list init
 
-    # elif DEVIATE and t == 4: # at time 4
-    #     for ac in aircraft_lst:
-    #         if ac.id == 3:
-    #             ac.speed = 2
+    existent_paths = [[] for i in range(len(timesteps))]    # initialising a list of lists to keep track of the existent paths of each agent
+                                                            # for the CBS and the Individual planner
 
-    #Do planning
-    if planner == "CBS":
-            if t in timesteps:
-                for ac in aircraft_lst:
-                    if ac.spawntime == t:
-                        ac.status = "taxiing"
-                        ac.position = nodes_dict[ac.start]["xy_pos"]
-                        # print("AC{} has spawned at time {}".format(ac.id, t))
 
-                current_node = 0
-                current_location_aircraft = [] # this will append the current location of each taxiing agent at the given t
-                for ac in aircraft_lst:
-                    if ac.status == "taxiing":
-                        id = ac.id
-                        position = ac.position
-                        for i in range(1,109):
-                            if nodes_dict[i]["xy_pos"] == position:
-                                current_node = nodes_dict[i]["id"]
-                        current_location_aircraft.append((current_node, t, id))
+    # result = []  # here the final results (in the form of a list of paths for each agent) are going to be stored
+    starts = []  # the starting node for each agent is stored here
+    goals = []   # the goal node for each agent is stored here
+    original_path_lst = []  # the length of the original path (calculated without constraints) for each agent is stored here
+
+
+
+    # id = 0
+    # new_aircraft = False
+
+    print("Simulation Started")
+    while running:
+        t= round(t,2)
+        if t%1 == 0:
+            print("Time: ", t)
+
+        #Check conditions for termination
+        if t >= time_end or escape_pressed:
+            running = False
+            pg.quit()
+            print("Simulation Stopped")
+            break
+
+        #Visualization: Update map if visualization is true
+        if visualization:
+            current_states = {} #Collect current states of all aircraft
+            for ac in aircraft_lst:
+                if ac.status == "taxiing":
+                    current_states[ac.id] = {"ac_id": ac.id,
+                                            "xy_pos": ac.position,
+                                            "heading": ac.heading}
+            escape_pressed = map_running(map_properties, current_states, t)
+            timer.sleep(visualization_speed)
+            # print(current_states)
+
+    # =============================================================================
+    # SPAWNING A SINGLE EXAMPLE AIRCRAFT
+        # #Spawn aircraft for this timestep (use for example a random process)
+        # if t == 1 :
+        #     ac0 = Aircraft(0, 'D', 'cS', 98,37, timesteps[0], nodes_dict)
+        #     aircraft_lst.append(ac0)
+        #     starts.append(ac0.start)
+        #     goals.append(ac0.goal)
+
+    # =============================================================================
+
+        for i in range(len(timesteps)):
+
+                if t == timesteps[i]:  # if we have an aircraft that is spawned at that moment
+
+                    startpositionsD = [34, 35, 36, 97, 98]  # the gate nodes, which are the starting positions for departing aircraft
+                    goalpositionsD = [1, 2]  # the runway entry points, which are the goals for departing aircraft
+                    startpositionsA = [37, 38]  # the runway exit points, which are the starting positions for arriving aircraft
+                    goalpositionsA = [34, 35, 36, 97, 98]  # the gates, which are the goal positions for arriving aircraft
+
+                    # startpositionsA = [1, 2]  # the runway entry points, which are the goals for departing aircraft
+                    # goalpositionsD = [37, 38]  # the runway exit points, which are the starting positions for arriving aircraft
+
+                    # Profiles
+                    departing_profiles = ['fast', 'slow'] #, 'cS'
+                    arriving_profiles = ['fast', 'slow'] #, 'cE', 'fS'
+
+                    switch = rd.randint(0, 1)  # randomising whether the aircraft that will be spawned will be an arriving or a departing
+                                                # aircraft
+
+                    if [t, startpositionsD[0]] in look_up_table_times_locations and [t, startpositionsD[1]] in look_up_table_times_locations\
+                            and [t, startpositionsD[2]] in look_up_table_times_locations:
+                        switch = 1  # the aircraft will be an arriving one
+                    elif [t, startpositionsA[0]] in look_up_table_times_locations or [t, startpositionsA[1]] in look_up_table_times_locations:
+                        # with the above statement, we ensure that aircraft do not spawn at the same time on the arrival runway
+                        switch = 0  # the aircraft will be a departing one
+
+
+
+                    if switch == 0:
+                        # the simulation will spawn a departing aircraft.
+                        starting_positionD = startpositionsD[rd.randint(0, len(startpositionsD) - 1)]
+
+                        while [t, starting_positionD] in look_up_table_times_locations:
+                            starting_positionD = startpositionsD[rd.randint(0, len(startpositionsD) - 1)]  # we get a combination of
+                                                            # spwaning timestep and starting position that has not been used so far
+
+                        profileD = departing_profiles[rd.randint(0, len(departing_profiles) - 1)]  # we get a random profile for the departing aircraft
+
+                        acD = Aircraft(i, 'D', profileD, starting_positionD,
+                                    goalpositionsD[rd.randint(0, len(goalpositionsD) - 1)], t, nodes_dict)  # we generate the aircraft object
+                        aircraft_lst.append(acD)  # and then append it to the aircraft list
+                        starts.append(acD.start)
+                        goals.append(acD.goal)
+                        look_up_table_times_locations.append([t, starting_positionD])  # we also append it to the lookup table to ensure
+                                                                # that only one aircraft will be spawn at that location at that timestep
+
+                    if switch == 1:
+                        # the simulation will spawn an arriving aircraft.
+                        starting_positionA = startpositionsA[rd.randint(0, len(startpositionsA) - 1)]
+
+                        while [t, starting_positionA] in look_up_table_times_locations:
+                            starting_positionA = startpositionsA[rd.randint(0, len(startpositionsA) - 1)]
+
+                        profileA = arriving_profiles[rd.randint(0, len(arriving_profiles) - 1)]  # we get a random profile for the arriving aircraft
+                        acA = Aircraft(i, 'A', profileA, starting_positionA,
+                                    goalpositionsA[rd.randint(0, len(goalpositionsA) - 1)], t, nodes_dict)
+                        aircraft_lst.append(acA)
+                        starts.append(acA.start)
+                        goals.append(acA.goal)
+                        look_up_table_times_locations.append([t, starting_positionA])
+
+
+        # Agent decides to change speed
+        if t%0.5 == 0:
+            for ac in aircraft_lst:
+                check_deviation(ac)
+
+        #Do planning
+        planning = False
+        if planner == "CBS":
+                an_aircraft_deviated = detect_deviation(aircraft_lst, nodes_dict, t)
+                if t in timesteps or an_aircraft_deviated:
+                    planning = True
+                    planner_start_time = timer.time()
+                    for ac in aircraft_lst:
+                        if ac.spawntime == t:
+                            ac.status = "taxiing"
+                            ac.position = nodes_dict[ac.start]["xy_pos"]
+                            # print("AC{} has spawned at time {}".format(ac.id, t))
+
+                    current_node = 0
+                    current_location_aircraft = [] # this will append the current location of each taxiing agent at the given t
+                    for ac in aircraft_lst:
+                        if ac.status == "taxiing":
+                            id = ac.id
+                            position = ac.position
+                            # if is_it_a_node(position, nodes_dict) == True:
+                            for i in range(1,109):
+                                if nodes_dict[i]["xy_pos"] == position:
+                                    current_node = nodes_dict[i]["id"]
+                            
+                            current_location_aircraft.append((current_node, t, id))
+                            # print("current_location_aircraft:",current_location_aircraft)
+                    
+                    if  an_aircraft_deviated and current_location_aircraft != [] and current_location_aircraft is not None:
+                        for ac in aircraft_lst:
+                            print("AC{} deviation == {}".format(ac.id, ac.deviated))
+                        current_location_aircraft = prep_CBS_replan(aircraft_lst, current_location_aircraft)
+                    
+                    # if an_aircraft_deviated:
+                    #     raise Exception("Current_location_aircraft:", current_location_aircraft)
+                    
+                    
+
+                    cbs = CBSSolver(nodes_dict, edges_dict, aircraft_lst, heuristics, t, starts, goals, current_location_aircraft)
+                    paths = cbs.find_solution(constraints, existent_paths, current_location_aircraft, collisions, time_start, original_path_lst, an_aircraft_deviated)
+                    
+                    if paths is not None:
+                        results = paths
+                        print("results:\n",results)
+
                 
-                
+        if aircraft_lst != []:
+            for ac in aircraft_lst:
+                if ac.status == "taxiing":
+                    ac.move(dt, t)
 
-                cbs = CBSSolver(nodes_dict, edges_dict, aircraft_lst, heuristics, t, starts, goals, current_location_aircraft)
-                paths = cbs.find_solution(constraints, existent_paths, current_location_aircraft, collisions, time_start, original_path_lst)
-                
-                if paths is not None:
-                    results = paths
-            
-            # IF DEVIATION OCCURS
-            if detect_deviation(aircraft_lst, nodes_dict, t): 
-                prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-                print("aircraft list:",aircraft_lst,
-                      "\nt:",t,
-                      "\nstarts:",starts,
-                      "\ngoals:",goals,
-                      "\ncurrent location aircraft:",current_location_aircraft,
-                      "\nconstraints:",constraints,
-                      "\nexistent paths:",existent_paths,
-                      "\ncollisions:",collisions,
-                      "\ntime_start:",time_start)
-                raise Exception("Aircraft deviated from path!")
-                cbs = CBSSolver(nodes_dict, edges_dict, aircraft_lst, heuristics, t, starts, goals, current_location_aircraft)
-                paths = cbs.find_solution(constraints, existent_paths, current_location_aircraft, collisions, time_start, original_path_lst)
-                
-                if paths is not None:
-                    results = paths
+        # current_time = timer.time()
+        t = t + dt # Time update
+        
+        if planning:
+            cpu_time = timer.time() - planner_start_time
+            cpu_time_list.append(cpu_time)
+
+        # else:
+        #     raise Exception("Planner:", planner, "is not defined.")
+
+        #Move the aircraft that are taxiing
+
+    # =============================================================================
+    # DATA COLLECTION 
+    # =============================================================================
 
 
-    # aircraft_infront(aircraft_lst, t) # if if there is about to be a rear end collision, slow down the faster aircraft
-            
-    if aircraft_lst != []:
-        for ac in aircraft_lst:
-            if ac.status == "taxiing":
-                ac.move(dt, t)
+    length_of_paths_per_agent = []
+    for ac in aircraft_lst:
+        length_of_paths_per_agent.append(ac.distance_travelled + 2)
 
-    t = t + dt
-            
+    cost_of_replanning = np.array(length_of_paths_per_agent) - np.array(original_path_lst)
 
+    for i in range(len(cost_of_replanning)): # The resulting path length is sometimes negative due to the nature of speed-up deviations
+        if cost_of_replanning[i] < 0:
+            cost_of_replanning[i] += 1
 
-
-
-
-    # elif planner == "Independent": # and aircraft_lst != []
-
-    #     # you can change the following condition to trigger replanning at a specified time step!!!! Right now it only plans at timestep 1.
-
-    #     # example:
-    #     # if t == 1 OR deviation_detected == True:
-    #     #   run_independent_planner()
-
-    #     if t == 1:
-
-    #     # this one is here for the random spawner
-    #     # if len(aircraft_lst) == 1: #(Hint: Think about the condition that triggers (re)planning)
-    #         # if aircraft_lst[0].spawntime == t: # t == 1 is reserved for the initial planning
-
-    #         run_independent_planner(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-
-    #     if len(aircraft_lst) != 1: # This part is here for when new aircraft are spawned in the middle of the simulation
-    #         for ac in aircraft_lst:
-    #             if ac.spawntime == t and t != 1: # REMOVE T==1 WHEN USING RANDOM SPAWNER
-    #                 print("AC{} has spawned at time {}".format(ac.id, t))
-    #                 ac.status = "taxiing" # taxiing
-    #                 ac.position = nodes_dict[ac.start]["xy_pos"] # position
-    #                 # print("now it has position:", ac.position, "and is", ac.status)
-    #                 prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-    #                 run_independent_replanner(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-    #                 # for ac in aircraft_lst:
-    #                 #     print(ac.path_to_goal)
-
-    #     if detect_deviation(aircraft_lst, nodes_dict, t):  # or new_aircraft == True
-    #         prep_replan(aircraft_lst, nodes_dict, edges_dict, heuristics, t)
-    #         run_independent_replanner(aircraft_lst, nodes_dict, edges_dict, heuristics, t) # Independent RE-planner
-    #         new_aircraft = False
-
-            # raise Exception("Aircraft deviated from path!")
+    # print("The orginial path lengths are: ", original_path_lst)
+    # print ("The length of the paths per agent is: ", length_of_paths_per_agent)
+    # print ("The cost of replanning is: ", cost_of_replanning)
 
 
+    collect_data = True
+    if collect_data:
+        # process the data
+        number_of_aircraft = number_of_aircraft
+        cpu_mean = statistics.mean(cpu_time_list)
+        cpu_variance = statistics.variance(cpu_time_list)
+        replanning_cost = sum(cost_of_replanning)
+        num_replannings = len(cpu_time_list)
 
-    # elif planner == "Prioritized":
-    #     run_prioritized_planner()
 
-    #elif planner == -> you may introduce other planners here
-    # else:
-    #     raise Exception("Planner:", planner, "is not defined.")
+        # make a dataframe with the simulation number as the row index, the number of aircraft as the second column and the rest of the columns as the cpu time list of the simulation
+        cpu_times = pd.read_csv('cpu_times_no_dev.csv')
 
-    #Move the aircraft that are taxiing
 
-# =============================================================================
-# 2. Implement analysis of output data here
-# =============================================================================
-#what data do you want to show?
+        # add the data to the dataframe as a row
+        cpu_times.loc[-1] = [number_of_aircraft, cpu_mean, cpu_variance, replanning_cost, num_replannings]     # adding a row
+        cpu_times.index = cpu_times.index + 1                                                                  # set the index
+        cpu_times = cpu_times.sort_index()                                                                     # sort the index
 
-# %%
+        print(cpu_times)
+
+        # Overwrite the data in the csv file
+        cpu_times.to_csv('cpu_times_no_dev.csv', index=False)
+
+    runnumb += 1
+
+
+    # %%

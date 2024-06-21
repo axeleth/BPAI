@@ -5,7 +5,7 @@ import math
 class Aircraft(object):
     """Aircraft class, should be used in the creation of new aircraft."""
 
-    def __init__(self, flight_id, a_d, start_node, goal_node, speed, spawn_time, nodes_dict):
+    def __init__(self, flight_id, a_d, profile, start_node, goal_node, spawn_time, nodes_dict):
         """
         Initalisation of aircraft object.
         INPUT:
@@ -16,27 +16,56 @@ class Aircraft(object):
             - spawn_time: spawn_time of a/c 
             - nodes_dict: copy of the nodes_dic
         """
+        # Deviation related (placed up here because it needs to be initialised before speed)
+        self.profile = profile              # the speed profile of the agent: determines deviation behaviour.
         
         #Fixed parameters
-        self.speed = speed         #how much a/c moves per unit of t          # normally set to 1 <-----!!
-        self.id = flight_id       #flight_id
-        self.type = a_d           #arrival or departure (A/D)
-        self.spawntime = spawn_time #spawntime
-        self.start = start_node   #start_node_id
-        self.goal = goal_node     #goal_node_id
-        self.nodes_dict = nodes_dict #keep copy of nodes dict
+        self.speed = self.init_speed()      #how much a/c moves per unit of t; Determined by speed profile
+        self.id = flight_id                 #flight_id
+        self.type = a_d                     #arrival or departure (A/D)
+        self.spawntime = spawn_time         #spawntime
+        self.start = start_node             #start_node_id
+        self.goal = goal_node               #goal_node_id
+        self.nodes_dict = nodes_dict        #keep copy of nodes dict
         
         #Route related
         self.status = None 
-        self.path_to_goal = [] #planned path left from current location
+        self.path_to_goal = []              #planned path left from current location
         self.from_to = [0,0]
+        self.path_so_far = []               #path that has been taken so far
 
         #State related
         self.heading = 0
-        self.position = (0,0) #xy position on map
-        self.replanning = False # is this agent replanning or spawning?
-        self.replan_time = None # what time does the agent plan start?
-        self.waiting = False # is the agent waiting for a slot?
+        self.position = (0,0)               #xy position on map
+        
+        # Deivation related
+        self.deviated = False               #has this agent deviated from its path?
+        self.deviation_type = None          #what type of deviation has this agent experienced?
+        self.waiting = False                # is the agent waiting for a slot?
+        self.distance_travelled = 0 
+        
+        # Replanning related –––– OBS; not used anymore!
+        self.replanning = False             # is this agent replanning or spawning?
+        self.replan_time = None             # what time does the agent plan start?
+
+    def init_speed(self):
+        """
+        INPUT:
+            - self = Aircraft object
+        RETURNS:
+            - speed = initial speed of aircraft based on profile
+        """
+
+        if self.profile == "cS":        return 1 # Start slow
+        elif self.profile == "fS":      return 2 # Start fast
+        elif self.profile == "cE":      return 2 # ––––||––––
+        
+        elif self.profile == "fast":    return 2 # Fast the whole time
+        elif self.profile == "slow":    return 1 # Slow the whole time
+        
+
+        else: raise Exception("Invalid speed profile '{}' for AC{}".format(self.profile, self.id))
+        
 
     def get_heading(self, xy_start, xy_next):
         """
@@ -133,6 +162,9 @@ class Aircraft(object):
                 
                 self.from_to = [new_from_id, new_next_id] #update new from and to node
 
+                self.distance_travelled += 1
+
+
         # elif detect_deviation(self.position, xy_to, self.path_to_goal, t, dt):
         #     raise Exception("Aircraft deviated from path")
         
@@ -160,7 +192,7 @@ class Aircraft(object):
                     self.path_to_goal = path[1:]
                     next_node_id = self.path_to_goal[0][0] #next node is first node in path_to_goal
                     self.from_to = [path[0][0], next_node_id]
-                    print("Path AC", self.id, ":", path)
+                    # print("Path AC", self.id, ":", path)
                 else:
                     raise Exception("No solution found for", self.id)
                 
