@@ -146,7 +146,7 @@ def create_graph(nodes_dict, edges_dict, plot_graph = True):
 
 number_of_aircraft = 20
 runnumb = 1
-while runnumb <= 15:
+while runnumb <= 5:
 
 
     #%% RUN SIMULATION
@@ -256,8 +256,8 @@ while runnumb <= 15:
                     # goalpositionsD = [37, 38]  # the runway exit points, which are the starting positions for arriving aircraft
 
                     # Profiles
-                    departing_profiles = ['fast', 'slow'] #, 'cS'
-                    arriving_profiles = ['fast', 'slow'] #, 'cE', 'fS'
+                    departing_profiles = ['fast', 'slow', 'cS'] #, 'cS'
+                    arriving_profiles = ['fast', 'slow', 'cE', 'fS'] #, 'cE', 'fS'
 
                     switch = rd.randint(0, 1)  # randomising whether the aircraft that will be spawned will be an arriving or a departing
                                                 # aircraft
@@ -403,7 +403,7 @@ while runnumb <= 15:
 
 
         # make a dataframe with the simulation number as the row index, the number of aircraft as the second column and the rest of the columns as the cpu time list of the simulation
-        cpu_times = pd.read_csv('cpu_times_no_dev.csv')
+        cpu_times = pd.read_csv('cpu_times.csv')
 
 
         # add the data to the dataframe as a row
@@ -414,7 +414,7 @@ while runnumb <= 15:
         print(cpu_times)
 
         # Overwrite the data in the csv file
-        cpu_times.to_csv('cpu_times_no_dev.csv', index=False)
+        cpu_times.to_csv('cpu_times.csv', index=False)
 
     runnumb += 1
 
