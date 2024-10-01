@@ -1,6 +1,5 @@
 # BPAI
 Axel Ehrnrooth's Bachelor Project for Artificial Intelligence BSc at VU Amsterdam
 
-*Contents:*
+This repository contains lots of files that are part of my research for the bachelor project. To find the final build, switch to the MAPF-work branch and navigate to /MAPF tutorials/Lab_Assignment2_ABMS/Lab_Assignment2_ABMS
 
-- The **MAPF** folder contains exercises for multi-agent path finding. These are a precursor to the project and should be thoroughly understood for a proper start of the real project.
