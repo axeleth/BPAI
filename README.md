@@ -1,4 +1,4 @@
-# Conflict-Based Search with Speed Deviations for Airport Taxiing
+# Efficient Airport Taxiing Operations: Conflict-Based Multi-Agent Path Finding with Speed Deviations
 
 Bachelor's thesis, BSc Artificial Intelligence, VU Amsterdam (Axel Ehrnrooth, 2024).
 
@@ -42,6 +42,10 @@ python run_me.py
 ```
 
 Simulation settings are at the top of `run_me.py`. Each run appends a row to `cpu_times.csv`.
+
+## Known issues
+
+- **Occasional crash during deviation replanning.** Some runs stop with `TypeError: cannot unpack non-iterable int object` in `prep_CBS_replan` (`thesis/deviate.py`, lines 74 and 109). Those lines expect `is_it_a_node(..., retrieve_node=True)` to return a tuple, but it returns only the node id. The error happens only when a replan is triggered while a slow aircraft is exactly on a node, so because spawning is random it appears in some runs and not others (in one recent check, 1 run out of 5). The code is kept exactly as submitted with the thesis. The fix is to replace `_,replan_node =` with `replan_node =` on both lines.
 
 ## Credits
 
